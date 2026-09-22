@@ -209,6 +209,20 @@ export default function Home() {
     setExercises((prev) => [...prev, ex]);
   };
 
+  const handleUpdateExercise = async (updated: Exercise) => {
+    await repository.saveExercise(updated, user?.id);
+    setExercises((prev) =>
+      prev.map((e) => (e.id === updated.id ? updated : e))
+    );
+  };
+
+  const handleSaveExerciseNote = async (exerciseId: string, notes: string) => {
+    await repository.saveExerciseNote(exerciseId, notes, user?.id);
+    setExercises((prev) =>
+      prev.map((e) => (e.id === exerciseId ? { ...e, notes } : e))
+    );
+  };
+
   const handleDeleteExercise = async (exId: string) => {
     await repository.deleteExercise(exId, user?.id);
     setExercises((prev) => prev.filter((e) => e.id !== exId));
@@ -321,8 +335,12 @@ export default function Home() {
         {view === 'exercises' && (
           <ExercisesView
             exercises={exercises}
+            workouts={workouts}
             onAddExercise={handleAddExercise}
+            onUpdateExercise={handleUpdateExercise}
+            onSaveExerciseNote={handleSaveExerciseNote}
             onDeleteExercise={handleDeleteExercise}
+            onViewProgress={() => setView('progress')}
             C={C}
             t={t}
           />

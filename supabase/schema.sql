@@ -55,6 +55,7 @@ create table if not exists public.exercises (
   name text not null,
   category text not null check (category in ('push', 'pull', 'legs', 'core')),
   muscle text not null,
+  description text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -75,6 +76,23 @@ create policy "Users can update their own custom exercises"
 create policy "Users can delete their own custom exercises" 
   on public.exercises for delete 
   using (auth.uid() = user_id);
+
+-- Personal user notes/cues for any exercise (both system and custom)
+create table if not exists public.user_exercise_notes (
+  user_id uuid references auth.users on delete cascade not null,
+  exercise_id text references public.exercises on delete cascade not null,
+  notes text,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  primary key (user_id, exercise_id)
+);
+
+alter table public.user_exercise_notes enable row level security;
+
+create policy "Users can CRUD their own exercise notes"
+  on public.user_exercise_notes for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
 
 
 -- 3. ROUTINES (Plany treningowe)

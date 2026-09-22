@@ -1,19 +1,22 @@
 import React, { useState } from 'react';
 import { Colors } from '@/lib/theme';
 import { Translations } from '@/lib/i18n';
-import { Routine, Exercise } from '@/lib/types';
+import { Routine, Exercise, Workout } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { RoutineModal } from './RoutineModal';
-import { Plus, Play, Edit3, Trash2 } from 'lucide-react';
+import { ExerciseDetailModal } from '@/components/exercises/ExerciseDetailModal';
+import { Plus, Play, Edit3, Trash2, Info } from 'lucide-react';
 
 interface RoutinesViewProps {
   routines: Routine[];
   exercises: Exercise[];
+  workouts?: Workout[];
   hasActiveWorkout: boolean;
   onStartWorkout: (r: Routine) => void;
   onSaveRoutine: (r: Routine) => Promise<void>;
   onDeleteRoutine: (id: string) => Promise<void>;
+  onSaveExerciseNote?: (exerciseId: string, notes: string) => Promise<void>;
   C: Colors;
   t: Translations;
 }
@@ -21,10 +24,12 @@ interface RoutinesViewProps {
 export const RoutinesView: React.FC<RoutinesViewProps> = ({
   routines,
   exercises,
+  workouts = [],
   hasActiveWorkout,
   onStartWorkout,
   onSaveRoutine,
   onDeleteRoutine,
+  onSaveExerciseNote,
   C,
   t,
 }) => {
@@ -32,6 +37,7 @@ export const RoutinesView: React.FC<RoutinesViewProps> = ({
   const [editingRoutine, setEditingRoutine] = useState<Routine | null>(null);
   const [isNewOpen, setIsNewOpen] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [selectedExForDetail, setSelectedExForDetail] = useState<Exercise | null>(null);
 
   const activeRoutine = routines.find((r) => r.id === selectedId) || routines[0] || null;
 
@@ -176,7 +182,15 @@ export const RoutinesView: React.FC<RoutinesViewProps> = ({
                           style={{ borderColor: C.dim }}
                         >
                           <td className="py-3 pr-4 font-bold" style={{ color: C.text }}>
-                            {exObj?.name || e.exerciseId}
+                            <button
+                              type="button"
+                              onClick={() => exObj && setSelectedExForDetail(exObj)}
+                              className="hover:underline hover:text-gym-orange text-left font-bold cursor-pointer inline-flex items-center gap-1.5"
+                              title="Kliknij, aby zobaczyć opis i wskazówki techniczne"
+                            >
+                              <span>{exObj?.name || e.exerciseId}</span>
+                              <Info size={13} className="text-gray-400 opacity-60 hover:opacity-100" />
+                            </button>
                           </td>
                           <td className="py-3 pr-4 font-mono text-xs" style={{ color: C.muted }}>
                             {exObj?.muscle || '—'}
@@ -207,6 +221,23 @@ export const RoutinesView: React.FC<RoutinesViewProps> = ({
               setIsNewOpen(false);
               setEditingRoutine(null);
             }}
+            C={C}
+            t={t}
+          />
+        )}
+
+        {/* Exercise Detail & Description Modal */}
+        {selectedExForDetail && (
+          <ExerciseDetailModal
+            exercise={selectedExForDetail}
+            workouts={workouts}
+            onSaveNote={async (exId, notes) => {
+              if (onSaveExerciseNote) {
+                await onSaveExerciseNote(exId, notes);
+              }
+              setSelectedExForDetail((prev) => (prev ? { ...prev, notes } : null));
+            }}
+            onClose={() => setSelectedExForDetail(null)}
             C={C}
             t={t}
           />

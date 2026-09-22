@@ -6,6 +6,8 @@ export type Exercise = {
   category: ExerciseCategory;
   muscle: string;
   isCustom?: boolean;
+  description?: string;
+  notes?: string;
 };
 
 export type SetLog = {

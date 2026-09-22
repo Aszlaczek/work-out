@@ -146,21 +146,44 @@ export const repository = {
     const client = getSupabaseClient();
     if (client) {
       const { data, error } = await client.from('exercises').select('*').order('name');
+      let notesMap: Record<string, string> = {};
+
+      if (userId) {
+        const { data: notesData } = await client
+          .from('user_exercise_notes')
+          .select('exercise_id, notes')
+          .eq('user_id', userId);
+        if (notesData) {
+          notesData.forEach((n: any) => {
+            notesMap[n.exercise_id] = n.notes || '';
+          });
+        }
+      }
+
       if (!error && data && data.length > 0) {
         return data.map((e: any) => ({
           id: e.id,
           name: e.name,
           category: e.category,
           muscle: e.muscle,
+          description: e.description || '',
+          notes: notesMap[e.id] || '',
           isCustom: !!e.user_id,
         }));
       }
     }
 
-    // Local fallback: Predefined immutable exercises + user-specific custom exercises
+    // Local fallback: Predefined immutable exercises + user-specific custom exercises + user notes
     const userCustomKey = userId ? `gp_custom_exercises_${userId}` : 'gp_custom_exercises_demo';
     const customExercises = getLocal<Exercise[]>(userCustomKey, []);
-    return [...SEED_EXERCISES.map((e) => ({ ...e, isCustom: false })), ...customExercises];
+    const notesKey = userId ? `gp_exercise_notes_${userId}` : 'gp_exercise_notes_demo';
+    const localNotes = getLocal<Record<string, string>>(notesKey, {});
+
+    const all = [...SEED_EXERCISES.map((e) => ({ ...e, isCustom: false })), ...customExercises];
+    return all.map((e) => ({
+      ...e,
+      notes: localNotes[e.id] || e.notes || '',
+    }));
   },
 
   async saveExercise(exercise: Exercise, userId?: string): Promise<Exercise> {
@@ -171,8 +194,13 @@ export const repository = {
         name: exercise.name,
         category: exercise.category,
         muscle: exercise.muscle,
+        description: exercise.description || null,
         user_id: userId,
       });
+
+      if (exercise.notes !== undefined) {
+        await this.saveExerciseNote(exercise.id, exercise.notes, userId);
+      }
       return exercise;
     }
 
@@ -181,7 +209,30 @@ export const repository = {
     const current = getLocal<Exercise[]>(userCustomKey, []);
     const updated = [...current.filter((e) => e.id !== exercise.id), { ...exercise, isCustom: true }];
     setLocal(userCustomKey, updated);
+
+    if (exercise.notes !== undefined) {
+      await this.saveExerciseNote(exercise.id, exercise.notes, userId);
+    }
     return exercise;
+  },
+
+  async saveExerciseNote(exerciseId: string, notes: string, userId?: string): Promise<void> {
+    const client = getSupabaseClient();
+    if (client && userId) {
+      await client.from('user_exercise_notes').upsert({
+        user_id: userId,
+        exercise_id: exerciseId,
+        notes,
+        updated_at: new Date().toISOString(),
+      });
+      return;
+    }
+
+    // Local fallback
+    const notesKey = userId ? `gp_exercise_notes_${userId}` : 'gp_exercise_notes_demo';
+    const current = getLocal<Record<string, string>>(notesKey, {});
+    current[exerciseId] = notes;
+    setLocal(notesKey, current);
   },
 
   async deleteExercise(exerciseId: string, userId?: string): Promise<void> {

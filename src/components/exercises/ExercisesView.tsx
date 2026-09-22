@@ -1,25 +1,34 @@
 import React, { useState } from 'react';
 import { Colors } from '@/lib/theme';
 import { Translations } from '@/lib/i18n';
-import { Exercise, ExerciseCategory } from '@/lib/types';
+import { Exercise, ExerciseCategory, Workout } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
-import { Plus, Trash2, Search } from 'lucide-react';
+import { ExerciseDetailModal } from './ExerciseDetailModal';
+import { Plus, Trash2, Search, FileText, ChevronRight } from 'lucide-react';
 import { mkId } from '@/lib/repository';
 
 interface ExercisesViewProps {
   exercises: Exercise[];
+  workouts: Workout[];
   onAddExercise: (ex: Exercise) => Promise<void>;
+  onUpdateExercise: (ex: Exercise) => Promise<void>;
+  onSaveExerciseNote: (exerciseId: string, notes: string) => Promise<void>;
   onDeleteExercise: (id: string) => Promise<void>;
+  onViewProgress?: (exerciseId: string) => void;
   C: Colors;
   t: Translations;
 }
 
 export const ExercisesView: React.FC<ExercisesViewProps> = ({
   exercises,
+  workouts,
   onAddExercise,
+  onUpdateExercise,
+  onSaveExerciseNote,
   onDeleteExercise,
+  onViewProgress,
   C,
   t,
 }) => {
@@ -30,6 +39,7 @@ export const ExercisesView: React.FC<ExercisesViewProps> = ({
   const [name, setName] = useState('');
   const [cat, setCat] = useState<ExerciseCategory>('push');
   const [muscle, setMuscle] = useState('');
+  const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -70,6 +80,13 @@ export const ExercisesView: React.FC<ExercisesViewProps> = ({
     }
   };
 
+  const handleSaveNoteModal = async (exerciseId: string, notes: string) => {
+    await onSaveExerciseNote(exerciseId, notes);
+    if (selectedExercise && selectedExercise.id === exerciseId) {
+      setSelectedExercise({ ...selectedExercise, notes });
+    }
+  };
+
   return (
     <div className="h-full overflow-y-auto pb-24 md:pb-12">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
@@ -77,7 +94,7 @@ export const ExercisesView: React.FC<ExercisesViewProps> = ({
         <div className="flex items-center justify-between mb-6 sm:mb-8 flex-wrap gap-3">
           <div>
             <span className="font-mono text-xs uppercase" style={{ color: C.orange }}>
-              KATALOG RUCHÓW
+              KATALOG RUCHÓW & OPISY
             </span>
             <h1 className="font-display font-black text-3xl sm:text-4xl tracking-tight" style={{ color: C.text }}>
               {t.exercisesTitle}
@@ -185,21 +202,28 @@ export const ExercisesView: React.FC<ExercisesViewProps> = ({
           </button>
         </div>
 
-        {/* Exercises List */}
-        <div className="space-y-1.5">
+        {/* Exercises List - Clicking any item opens its description/details */}
+        <div className="space-y-2">
           {visible.map((e) => (
             <div
               key={e.id}
-              className="flex items-center gap-3 px-4 py-3 transition-all"
+              onClick={() => setSelectedExercise(e)}
+              className="p-3.5 sm:p-4 flex items-center justify-between gap-3 transition-all cursor-pointer group"
               style={{
                 background: C.card,
                 border: `1px solid ${C.border}`,
                 borderLeft: `3px solid ${e.isCustom ? C.violet : C.dim}`,
               }}
+              onMouseEnter={(x) => {
+                x.currentTarget.style.borderColor = C.orange;
+              }}
+              onMouseLeave={(x) => {
+                x.currentTarget.style.borderColor = C.border;
+              }}
             >
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-display font-bold text-sm sm:text-base truncate" style={{ color: C.text }}>
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <span className="font-display font-bold text-base sm:text-lg group-hover:text-gym-orange transition-colors truncate" style={{ color: C.text }}>
                     {e.name}
                   </span>
                   {e.isCustom && (
@@ -210,34 +234,36 @@ export const ExercisesView: React.FC<ExercisesViewProps> = ({
                       CUSTOM
                     </span>
                   )}
+                  {e.notes && (
+                    <span
+                      className="font-mono text-[10px] px-1.5 py-0.5 flex items-center gap-1"
+                      style={{ background: C.orange + '18', color: C.orange }}
+                      title="Posiada własny opis / wskazówki"
+                    >
+                      <FileText size={11} /> OPIS
+                    </span>
+                  )}
                 </div>
-                <div className="font-mono text-xs block sm:hidden mt-0.5" style={{ color: C.muted }}>
-                  {e.muscle} · {e.category.toUpperCase()}
+
+                <div className="flex items-center gap-2 font-mono text-xs" style={{ color: C.muted }}>
+                  <span>{e.muscle}</span>
+                  <span>·</span>
+                  <span className="uppercase">{e.category}</span>
                 </div>
+
+                {e.notes && (
+                  <p className="font-mono text-[11px] mt-1.5 truncate text-gray-400 italic">
+                    "{e.notes}"
+                  </p>
+                )}
               </div>
 
-              <span className="font-mono text-xs hidden sm:block shrink-0" style={{ color: C.muted }}>
-                {e.muscle}
-              </span>
-
-              <span
-                className="font-display font-bold text-[10px] tracking-widest px-2 py-0.5 uppercase hidden sm:block shrink-0"
-                style={{ background: C.dim, color: C.muted }}
-              >
-                {e.category}
-              </span>
-
-              {e.isCustom && (
-                <button
-                  type="button"
-                  onClick={() => setConfirmDeleteId(e.id)}
-                  className="font-mono text-xs hover:text-red-500 cursor-pointer p-1 transition-colors"
-                  style={{ color: C.muted }}
-                  title={t.delete}
-                >
-                  <Trash2 size={15} />
-                </button>
-              )}
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="font-mono text-xs hidden sm:inline-block" style={{ color: C.muted }}>
+                  Szczegóły / Opis
+                </span>
+                <ChevronRight size={16} className="text-gray-400 group-hover:translate-x-0.5 transition-transform" />
+              </div>
             </div>
           ))}
 
@@ -251,32 +277,19 @@ export const ExercisesView: React.FC<ExercisesViewProps> = ({
           )}
         </div>
 
-        {/* Confirm Delete Exercise Modal */}
-        {confirmDeleteId && (
-          <Modal onClose={() => setConfirmDeleteId(null)} C={C}>
-            <h3 className="font-display font-bold text-lg tracking-tight mb-2" style={{ color: C.text }}>
-              {t.confirmDelete}
-            </h3>
-            <p className="font-mono text-xs mb-5" style={{ color: C.muted }}>
-              Czy na pewno chcesz usunąć to własne ćwiczenie?
-            </p>
-            <div className="flex gap-2 justify-end">
-              <Button variant="ghost" small onClick={() => setConfirmDeleteId(null)} C={C}>
-                {t.cancel}
-              </Button>
-              <Button
-                variant="danger"
-                small
-                onClick={async () => {
-                  await onDeleteExercise(confirmDeleteId);
-                  setConfirmDeleteId(null);
-                }}
-                C={C}
-              >
-                {t.delete}
-              </Button>
-            </div>
-          </Modal>
+        {/* Exercise Detail & Description Modal */}
+        {selectedExercise && (
+          <ExerciseDetailModal
+            exercise={selectedExercise}
+            workouts={workouts}
+            onSaveNote={handleSaveNoteModal}
+            onUpdateCustomExercise={onUpdateExercise}
+            onDeleteExercise={onDeleteExercise}
+            onViewProgress={onViewProgress}
+            onClose={() => setSelectedExercise(null)}
+            C={C}
+            t={t}
+          />
         )}
       </div>
     </div>
