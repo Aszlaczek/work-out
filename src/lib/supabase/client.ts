@@ -1,15 +1,15 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 
 export const isSupabaseConfigured = (): boolean => {
   return (
     !!supabaseUrl &&
-    supabaseUrl.startsWith('http') &&
-    !supabaseUrl.includes('your-project') &&
+    supabaseUrl.startsWith("http") &&
+    !supabaseUrl.includes("your-project") &&
     !!supabaseAnonKey &&
-    supabaseAnonKey !== 'your-anon-key-here' &&
+    supabaseAnonKey !== "your-anon-key-here" &&
     supabaseAnonKey.length > 20
   );
 };
