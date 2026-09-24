@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { Theme, getColors, Colors } from '@/lib/theme';
-import { Lang, T } from '@/lib/i18n';
+import React, { useState, useEffect, useCallback } from "react";
+import { Theme, getColors, Colors } from "@/lib/theme";
+import { Lang, T } from "@/lib/i18n";
 import {
   AppUser,
   Routine,
@@ -10,36 +10,38 @@ import {
   Exercise,
   ActiveWorkout,
   ActiveExercise,
-} from '@/lib/types';
-import { repository, mkId } from '@/lib/repository';
-import { Header, ViewType } from '@/components/layout/Header';
-import { BottomNav, MobileHeader } from '@/components/layout/BottomNav';
-import { AmbientBlobs } from '@/components/layout/AmbientBlobs';
-import { AuthView } from '@/components/auth/AuthView';
-import { DashboardView } from '@/components/dashboard/DashboardView';
-import { RoutinesView } from '@/components/routines/RoutinesView';
-import { ExercisesView } from '@/components/exercises/ExercisesView';
-import { CalendarView } from '@/components/calendar/CalendarView';
-import { ActiveWorkoutLogger } from '@/components/workouts/ActiveWorkoutLogger';
-import { ProgressView } from '@/components/progress/ProgressView';
-import { SettingsView } from '@/components/settings/SettingsView';
-import { WorkoutEditModal } from '@/components/workouts/WorkoutEditModal';
-import { WorkoutDetailModal } from '@/components/workouts/WorkoutDetailModal';
-import { ManualWorkoutModal } from '@/components/workouts/ManualWorkoutModal';
-import { RoutineModal } from '@/components/routines/RoutineModal';
+} from "@/lib/types";
+import { repository, mkId } from "@/lib/repository";
+import { Header, ViewType } from "@/components/layout/Header";
+import { BottomNav, MobileHeader } from "@/components/layout/BottomNav";
+import { AmbientBlobs } from "@/components/layout/AmbientBlobs";
+import { AuthView } from "@/components/auth/AuthView";
+import { DashboardView } from "@/components/dashboard/DashboardView";
+import { RoutinesView } from "@/components/routines/RoutinesView";
+import { ExercisesView } from "@/components/exercises/ExercisesView";
+import { CalendarView } from "@/components/calendar/CalendarView";
+import { ActiveWorkoutLogger } from "@/components/workouts/ActiveWorkoutLogger";
+import { ProgressView } from "@/components/progress/ProgressView";
+import { SettingsView } from "@/components/settings/SettingsView";
+import { WorkoutEditModal } from "@/components/workouts/WorkoutEditModal";
+import { WorkoutDetailModal } from "@/components/workouts/WorkoutDetailModal";
+import { ManualWorkoutModal } from "@/components/workouts/ManualWorkoutModal";
+import { RoutineModal } from "@/components/routines/RoutineModal";
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
   const [user, setUser] = useState<AppUser | null>(null);
-  const [theme, setTheme] = useState<Theme>('dark');
-  const [lang, setLang] = useState<Lang>('pl');
-  const [view, setView] = useState<ViewType>('dashboard');
+  const [theme, setTheme] = useState<Theme>("dark");
+  const [lang, setLang] = useState<Lang>("pl");
+  const [view, setView] = useState<ViewType>("dashboard");
 
   // Application Data State
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [exercises, setExercises] = useState<Exercise[]>([]);
-  const [activeWorkout, setActiveWorkout] = useState<ActiveWorkout | null>(null);
+  const [activeWorkout, setActiveWorkout] = useState<ActiveWorkout | null>(
+    null,
+  );
 
   // Modals State
   const [editingWorkout, setEditingWorkout] = useState<Workout | null>(null);
@@ -54,13 +56,13 @@ export default function Home() {
   // Load initial settings and active user
   useEffect(() => {
     setMounted(true);
-    const savedTheme = localStorage.getItem('gp_theme') as Theme;
-    if (savedTheme === 'dark' || savedTheme === 'light') setTheme(savedTheme);
+    const savedTheme = localStorage.getItem("gp_theme") as Theme;
+    if (savedTheme === "dark" || savedTheme === "light") setTheme(savedTheme);
 
-    const savedLang = localStorage.getItem('gp_lang') as Lang;
-    if (savedLang === 'pl' || savedLang === 'en') setLang(savedLang);
+    const savedLang = localStorage.getItem("gp_lang") as Lang;
+    if (savedLang === "pl" || savedLang === "en") setLang(savedLang);
 
-    const savedActive = localStorage.getItem('gp_active_workout');
+    const savedActive = localStorage.getItem("gp_active_workout");
     if (savedActive) {
       try {
         setActiveWorkout(JSON.parse(savedActive));
@@ -75,7 +77,7 @@ export default function Home() {
 
   // Update HTML body style on theme change
   useEffect(() => {
-    if (typeof document !== 'undefined') {
+    if (typeof document !== "undefined") {
       document.body.style.backgroundColor = C.bg;
       document.body.style.color = C.text;
     }
@@ -83,21 +85,22 @@ export default function Home() {
 
   const handleThemeChange = (newTheme: Theme) => {
     setTheme(newTheme);
-    localStorage.setItem('gp_theme', newTheme);
+    localStorage.setItem("gp_theme", newTheme);
   };
 
   const handleLangChange = (newLang: Lang) => {
     setLang(newLang);
-    localStorage.setItem('gp_lang', newLang);
+    localStorage.setItem("gp_lang", newLang);
   };
 
   // Load data for active user
   const loadUserData = useCallback(async (userId?: string) => {
-    const [fetchedRoutines, fetchedWorkouts, fetchedExercises] = await Promise.all([
-      repository.getRoutines(userId),
-      repository.getWorkouts(userId),
-      repository.getExercises(userId),
-    ]);
+    const [fetchedRoutines, fetchedWorkouts, fetchedExercises] =
+      await Promise.all([
+        repository.getRoutines(userId),
+        repository.getWorkouts(userId),
+        repository.getExercises(userId),
+      ]);
     setRoutines(fetchedRoutines);
     setWorkouts(fetchedWorkouts);
     setExercises(fetchedExercises);
@@ -112,7 +115,7 @@ export default function Home() {
   // Persist active workout to local storage
   const handleUpdateActiveWorkout = (updated: ActiveWorkout) => {
     setActiveWorkout(updated);
-    localStorage.setItem('gp_active_workout', JSON.stringify(updated));
+    localStorage.setItem("gp_active_workout", JSON.stringify(updated));
   };
 
   // Start live workout from routine
@@ -124,28 +127,31 @@ export default function Home() {
       exercises: routine.exercises.map((re) => ({
         exerciseId: re.exerciseId,
         sets: Array.from({ length: re.targetSets }, () => ({
-          weight: '',
+          weight: "",
           reps: String(re.targetReps),
-          rpe: '',
+          rpe: "",
           done: false,
         })),
       })),
     };
     handleUpdateActiveWorkout(newActive);
-    setView('workout');
+    setView("workout");
   };
 
   // Finish and save live workout to Supabase
   const handleFinishActiveWorkout = async () => {
     if (!activeWorkout) return;
-    const duration = Math.max(1, Math.floor((Date.now() - activeWorkout.startedAt) / 60000));
+    const duration = Math.max(
+      1,
+      Math.floor((Date.now() - activeWorkout.startedAt) / 60000),
+    );
     const newWorkout: Workout = {
       id: mkId(),
       routineId: activeWorkout.routineId,
       routineName: activeWorkout.routineName,
       date: new Date().toISOString().slice(0, 10),
       duration,
-      status: 'completed',
+      status: "completed",
       exercises: activeWorkout.exercises.map((e) => ({
         exerciseId: e.exerciseId,
         sets: e.sets
@@ -163,14 +169,14 @@ export default function Home() {
     await repository.saveWorkout(newWorkout, user?.id);
     setWorkouts((prev) => [newWorkout, ...prev]);
     setActiveWorkout(null);
-    localStorage.removeItem('gp_active_workout');
-    setView('dashboard');
+    localStorage.removeItem("gp_active_workout");
+    setView("dashboard");
   };
 
   const handleDiscardActiveWorkout = () => {
     setActiveWorkout(null);
-    localStorage.removeItem('gp_active_workout');
-    setView('dashboard');
+    localStorage.removeItem("gp_active_workout");
+    setView("dashboard");
   };
 
   // Save updated workout ("Uaktualnienie swojego treningu")
@@ -212,14 +218,14 @@ export default function Home() {
   const handleUpdateExercise = async (updated: Exercise) => {
     await repository.saveExercise(updated, user?.id);
     setExercises((prev) =>
-      prev.map((e) => (e.id === updated.id ? updated : e))
+      prev.map((e) => (e.id === updated.id ? updated : e)),
     );
   };
 
   const handleSaveExerciseNote = async (exerciseId: string, notes: string) => {
     await repository.saveExerciseNote(exerciseId, notes, user?.id);
     setExercises((prev) =>
-      prev.map((e) => (e.id === exerciseId ? { ...e, notes } : e))
+      prev.map((e) => (e.id === exerciseId ? { ...e, notes } : e)),
     );
   };
 
@@ -238,18 +244,18 @@ export default function Home() {
     await repository.signOut();
     setUser(null);
     setActiveWorkout(null);
-    setView('dashboard');
+    setView("dashboard");
   };
 
   const handleDeleteAccount = async () => {
     await repository.deleteAccount();
     setUser(null);
     setActiveWorkout(null);
-    setView('dashboard');
+    setView("dashboard");
   };
 
   const handleResetLocalData = () => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       localStorage.clear();
       window.location.reload();
     }
@@ -274,7 +280,10 @@ export default function Home() {
   }
 
   return (
-    <div className="flex flex-col min-h-[100dvh] relative overflow-hidden" style={{ background: C.bg, color: C.text }}>
+    <div
+      className="flex flex-col min-h-[100dvh] relative overflow-hidden"
+      style={{ background: C.bg, color: C.text }}
+    >
       <AmbientBlobs C={C} />
 
       {/* Desktop Header Navigation */}
@@ -301,7 +310,7 @@ export default function Home() {
 
       {/* Main View Area */}
       <main className="flex-1 min-h-0 relative z-10">
-        {view === 'dashboard' && (
+        {view === "dashboard" && (
           <DashboardView
             workouts={workouts}
             routines={routines}
@@ -319,7 +328,7 @@ export default function Home() {
           />
         )}
 
-        {view === 'routines' && (
+        {view === "routines" && (
           <RoutinesView
             routines={routines}
             exercises={exercises}
@@ -332,7 +341,7 @@ export default function Home() {
           />
         )}
 
-        {view === 'exercises' && (
+        {view === "exercises" && (
           <ExercisesView
             exercises={exercises}
             workouts={workouts}
@@ -340,13 +349,13 @@ export default function Home() {
             onUpdateExercise={handleUpdateExercise}
             onSaveExerciseNote={handleSaveExerciseNote}
             onDeleteExercise={handleDeleteExercise}
-            onViewProgress={() => setView('progress')}
+            onViewProgress={() => setView("progress")}
             C={C}
             t={t}
           />
         )}
 
-        {view === 'calendar' && (
+        {view === "calendar" && (
           <CalendarView
             workouts={workouts}
             routines={routines}
@@ -359,7 +368,7 @@ export default function Home() {
           />
         )}
 
-        {view === 'workout' && activeWorkout && (
+        {view === "workout" && activeWorkout && (
           <ActiveWorkoutLogger
             active={activeWorkout}
             onUpdate={handleUpdateActiveWorkout}
@@ -371,16 +380,11 @@ export default function Home() {
           />
         )}
 
-        {view === 'progress' && (
-          <ProgressView
-            workouts={workouts}
-            exercises={exercises}
-            C={C}
-            t={t}
-          />
+        {view === "progress" && (
+          <ProgressView workouts={workouts} exercises={exercises} C={C} t={t} />
         )}
 
-        {view === 'settings' && (
+        {view === "settings" && (
           <SettingsView
             user={user}
             theme={theme}
