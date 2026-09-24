@@ -18,6 +18,9 @@ interface WorkoutEditModalProps {
   t: Translations;
 }
 
+// minmax(0, 1fr) keeps the number inputs from forcing the row wider than the modal
+const SET_GRID = 'grid-cols-[28px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_32px_28px]';
+
 export const WorkoutEditModal: React.FC<WorkoutEditModalProps> = ({
   workout,
   allExercises,
@@ -260,17 +263,17 @@ export const WorkoutEditModal: React.FC<WorkoutEditModalProps> = ({
             {exercises.map((we, exIdx) => (
               <div
                 key={we.exerciseId}
-                className="p-3 border-l-2"
+                className="p-3 border-l-2 min-w-0 overflow-hidden"
                 style={{ background: C.surface, borderColor: C.violet }}
               >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-display font-bold text-sm tracking-wide" style={{ color: C.text }}>
+                <div className="flex items-center justify-between mb-2 gap-2">
+                  <span className="font-display font-bold text-sm tracking-wide min-w-0 break-words" style={{ color: C.text }}>
                     {getExName(we.exerciseId).toUpperCase()}
                   </span>
                   <button
                     type="button"
                     onClick={() => handleRemoveExercise(exIdx)}
-                    className="font-mono text-xs hover:text-red-500 cursor-pointer p-1"
+                    className="font-mono text-xs hover:text-red-500 cursor-pointer p-1 shrink-0"
                     style={{ color: C.muted }}
                     title="Usuń ćwiczenie z treningu"
                   >
@@ -280,7 +283,7 @@ export const WorkoutEditModal: React.FC<WorkoutEditModalProps> = ({
 
                 {/* Sets header */}
                 <div
-                  className="grid grid-cols-[28px_1fr_1fr_1fr_32px_28px] gap-2 font-display font-bold text-[10px] tracking-wider px-1 mb-1"
+                  className={`grid ${SET_GRID} gap-2 font-display font-bold text-[10px] tracking-wider px-1 mb-1`}
                   style={{ color: C.muted }}
                 >
                   <span className="text-center">#</span>
@@ -296,7 +299,7 @@ export const WorkoutEditModal: React.FC<WorkoutEditModalProps> = ({
                   {we.sets.map((s, sIdx) => (
                     <div
                       key={s.id || sIdx}
-                      className="grid grid-cols-[28px_1fr_1fr_1fr_32px_28px] gap-2 items-center"
+                      className={`grid ${SET_GRID} gap-2 items-center`}
                     >
                       <span className="font-mono text-xs text-center" style={{ color: C.muted }}>
                         {sIdx + 1}
@@ -308,7 +311,7 @@ export const WorkoutEditModal: React.FC<WorkoutEditModalProps> = ({
                         onChange={(e) =>
                           handleUpdateSet(exIdx, sIdx, 'weight', parseFloat(e.target.value) || 0)
                         }
-                        className="px-2 py-1 font-mono text-xs text-center outline-none"
+                        className="w-full min-w-0 px-2 py-1 font-mono text-xs text-center outline-none"
                         style={{ background: C.card, border: `1px solid ${C.border}`, color: C.text }}
                       />
                       <input
@@ -317,7 +320,7 @@ export const WorkoutEditModal: React.FC<WorkoutEditModalProps> = ({
                         onChange={(e) =>
                           handleUpdateSet(exIdx, sIdx, 'reps', parseInt(e.target.value) || 0)
                         }
-                        className="px-2 py-1 font-mono text-xs text-center outline-none"
+                        className="w-full min-w-0 px-2 py-1 font-mono text-xs text-center outline-none"
                         style={{ background: C.card, border: `1px solid ${C.border}`, color: C.text }}
                       />
                       <input
@@ -333,7 +336,7 @@ export const WorkoutEditModal: React.FC<WorkoutEditModalProps> = ({
                             e.target.value ? parseFloat(e.target.value) : null
                           )
                         }
-                        className="px-2 py-1 font-mono text-xs text-center outline-none"
+                        className="w-full min-w-0 px-2 py-1 font-mono text-xs text-center outline-none"
                         style={{ background: C.card, border: `1px solid ${C.border}`, color: C.text }}
                       />
                       <button

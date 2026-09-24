@@ -160,16 +160,16 @@ export const RoutinesView: React.FC<RoutinesViewProps> = ({
 
               {/* Exercises table */}
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full table-fixed text-sm">
                   <thead>
                     <tr
                       className="font-display font-bold text-xs tracking-widest border-b"
                       style={{ color: C.muted, borderColor: C.border }}
                     >
-                      <th className="text-left pb-2.5 pr-4 uppercase">{t.exercise}</th>
-                      <th className="text-left pb-2.5 pr-4 uppercase">{t.muscle}</th>
-                      <th className="text-right pb-2.5 pr-4 uppercase">{t.series}</th>
-                      <th className="text-right pb-2.5 uppercase">{t.reps}</th>
+                      <th className="w-auto text-left pb-2.5 pr-3 uppercase">{t.exercise}</th>
+                      <th className="w-[34%] hidden sm:table-cell text-left pb-2.5 pr-3 uppercase">{t.muscle}</th>
+                      <th className="w-14 sm:w-16 text-right pb-2.5 pr-3 uppercase">{t.series}</th>
+                      <th className="w-14 sm:w-16 text-right pb-2.5 uppercase">{t.reps}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -181,24 +181,24 @@ export const RoutinesView: React.FC<RoutinesViewProps> = ({
                           className="border-b transition-colors"
                           style={{ borderColor: C.dim }}
                         >
-                          <td className="py-3 pr-4 font-bold" style={{ color: C.text }}>
+                          <td className="py-3 pr-3 break-words" style={{ color: C.text }}>
                             <button
                               type="button"
                               onClick={() => exObj && setSelectedExForDetail(exObj)}
-                              className="hover:underline hover:text-gym-orange text-left font-bold cursor-pointer inline-flex items-center gap-1.5"
+                              className="hover:underline hover:text-gym-orange text-left font-bold cursor-pointer inline-flex items-start gap-1.5 min-w-0"
                               title="Kliknij, aby zobaczyć opis i wskazówki techniczne"
                             >
-                              <span>{exObj?.name || e.exerciseId}</span>
-                              <Info size={13} className="text-gray-400 opacity-60 hover:opacity-100" />
+                              <span className="min-w-0 break-words">{exObj?.name || e.exerciseId}</span>
+                              <Info size={13} className="text-gray-400 opacity-60 hover:opacity-100 shrink-0 mt-0.5" />
                             </button>
                           </td>
-                          <td className="py-3 pr-4 font-mono text-xs" style={{ color: C.muted }}>
+                          <td className="py-3 pr-3 font-mono text-xs hidden sm:table-cell break-words" style={{ color: C.muted }}>
                             {exObj?.muscle || '—'}
                           </td>
-                          <td className="py-3 pr-4 text-right font-mono font-bold text-base" style={{ color: C.orange }}>
+                          <td className="py-3 pr-3 text-right font-mono font-bold text-base whitespace-nowrap" style={{ color: C.orange }}>
                             {e.targetSets}
                           </td>
-                          <td className="py-3 text-right font-mono text-xs" style={{ color: C.muted }}>
+                          <td className="py-3 text-right font-mono text-xs whitespace-nowrap" style={{ color: C.muted }}>
                             {e.targetReps}
                           </td>
                         </tr>

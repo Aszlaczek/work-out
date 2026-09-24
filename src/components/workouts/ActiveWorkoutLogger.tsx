@@ -16,6 +16,9 @@ interface ActiveWorkoutLoggerProps {
   t: Translations;
 }
 
+// minmax(0, 1fr) keeps the number inputs from forcing the row wider than the card
+const SET_GRID = 'grid-cols-[26px_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_36px_24px]';
+
 export const ActiveWorkoutLogger: React.FC<ActiveWorkoutLoggerProps> = ({
   active,
   onUpdate,
@@ -161,17 +164,17 @@ export const ActiveWorkoutLogger: React.FC<ActiveWorkoutLoggerProps> = ({
           {active.exercises.map((ex, ei) => (
             <div
               key={ei}
-              className="p-4 sm:p-5 slide-up"
+              className="p-4 sm:p-5 slide-up min-w-0 overflow-hidden"
               style={{ background: C.card, borderLeft: `3px solid ${C.violet}` }}
             >
               <div className="flex items-center justify-between mb-4">
-                <div className="font-display font-bold text-lg sm:text-xl tracking-wide" style={{ color: C.text }}>
+                <div className="font-display font-bold text-lg sm:text-xl tracking-wide min-w-0 break-words" style={{ color: C.text }}>
                   {getExName(ex.exerciseId).toUpperCase()}
                 </div>
                 <button
                   type="button"
                   onClick={() => removeExerciseFromActive(ei)}
-                  className="font-mono text-xs hover:text-red-500 p-1 cursor-pointer"
+                  className="font-mono text-xs hover:text-red-500 p-1 cursor-pointer shrink-0"
                   style={{ color: C.muted }}
                   title="Usuń ćwiczenie"
                 >
@@ -181,7 +184,7 @@ export const ActiveWorkoutLogger: React.FC<ActiveWorkoutLoggerProps> = ({
 
               {/* Sets Table Header */}
               <div
-                className="grid grid-cols-[26px_1fr_1fr_1fr_36px_24px] gap-2 font-display font-bold text-xs tracking-widest px-1 mb-2"
+                className={`grid ${SET_GRID} gap-2 font-display font-bold text-xs tracking-widest px-1 mb-2`}
                 style={{ color: C.muted }}
               >
                 <span className="text-center">#</span>
@@ -197,7 +200,7 @@ export const ActiveWorkoutLogger: React.FC<ActiveWorkoutLoggerProps> = ({
                 {ex.sets.map((s, si) => (
                   <div
                     key={si}
-                    className={`grid grid-cols-[26px_1fr_1fr_1fr_36px_24px] gap-2 items-center transition-opacity ${
+                    className={`grid ${SET_GRID} gap-2 items-center transition-opacity ${
                       s.done ? 'opacity-40' : ''
                     }`}
                   >
@@ -211,7 +214,7 @@ export const ActiveWorkoutLogger: React.FC<ActiveWorkoutLoggerProps> = ({
                       value={s.weight}
                       onChange={(e) => updateSetField(ei, si, 'weight', e.target.value)}
                       placeholder="0"
-                      className="px-2 py-2 font-mono text-sm text-center outline-none transition-all rounded-none"
+                      className="w-full min-w-0 px-2 py-2 font-mono text-sm text-center outline-none transition-all rounded-none"
                       style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text }}
                       onFocus={(e) => (e.target.style.borderColor = C.violet)}
                       onBlur={(e) => (e.target.style.borderColor = C.border)}
@@ -222,7 +225,7 @@ export const ActiveWorkoutLogger: React.FC<ActiveWorkoutLoggerProps> = ({
                       value={s.reps}
                       onChange={(e) => updateSetField(ei, si, 'reps', e.target.value)}
                       placeholder="0"
-                      className="px-2 py-2 font-mono text-sm text-center outline-none transition-all rounded-none"
+                      className="w-full min-w-0 px-2 py-2 font-mono text-sm text-center outline-none transition-all rounded-none"
                       style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text }}
                       onFocus={(e) => (e.target.style.borderColor = C.violet)}
                       onBlur={(e) => (e.target.style.borderColor = C.border)}
@@ -234,7 +237,7 @@ export const ActiveWorkoutLogger: React.FC<ActiveWorkoutLoggerProps> = ({
                       value={s.rpe}
                       onChange={(e) => updateSetField(ei, si, 'rpe', e.target.value)}
                       placeholder="—"
-                      className="px-2 py-2 font-mono text-sm text-center outline-none transition-all rounded-none"
+                      className="w-full min-w-0 px-2 py-2 font-mono text-sm text-center outline-none transition-all rounded-none"
                       style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text }}
                       onFocus={(e) => (e.target.style.borderColor = C.violet)}
                       onBlur={(e) => (e.target.style.borderColor = C.border)}
