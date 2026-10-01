@@ -10,12 +10,14 @@ import { Plus, Play, Edit3, Trash2, Info } from 'lucide-react';
 
 interface RoutinesViewProps {
   routines: Routine[];
+  hiddenRoutines?: Routine[];
   exercises: Exercise[];
   workouts?: Workout[];
   hasActiveWorkout: boolean;
   onStartWorkout: (r: Routine) => void;
-  onSaveRoutine: (r: Routine) => Promise<void>;
+  onSaveRoutine: (r: Routine) => Promise<Routine>;
   onDeleteRoutine: (id: string) => Promise<void>;
+  onRestoreRoutine?: (id: string) => Promise<void>;
   onSaveExerciseNote?: (exerciseId: string, notes: string) => Promise<void>;
   C: Colors;
   t: Translations;
@@ -23,12 +25,14 @@ interface RoutinesViewProps {
 
 export const RoutinesView: React.FC<RoutinesViewProps> = ({
   routines,
+  hiddenRoutines = [],
   exercises,
   workouts = [],
   hasActiveWorkout,
   onStartWorkout,
   onSaveRoutine,
   onDeleteRoutine,
+  onRestoreRoutine,
   onSaveExerciseNote,
   C,
   t,
@@ -37,9 +41,11 @@ export const RoutinesView: React.FC<RoutinesViewProps> = ({
   const [editingRoutine, setEditingRoutine] = useState<Routine | null>(null);
   const [isNewOpen, setIsNewOpen] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [showHidden, setShowHidden] = useState(false);
   const [selectedExForDetail, setSelectedExForDetail] = useState<Exercise | null>(null);
 
   const activeRoutine = routines.find((r) => r.id === selectedId) || routines[0] || null;
+  const routineToDelete = routines.find((r) => r.id === confirmDeleteId) || null;
 
   const getEx = (id: string) => {
     return exercises.find((e) => e.id === id);
@@ -68,7 +74,7 @@ export const RoutinesView: React.FC<RoutinesViewProps> = ({
           {/* Routines selector tabs / cards */}
           <div className="md:col-span-4 space-y-2">
             <span className="block font-display font-bold text-xs tracking-widest uppercase mb-2" style={{ color: C.muted }}>
-              TWOJE PLANY ({routines.length})
+              {t.availableRoutines} ({routines.length})
             </span>
             {routines.map((r) => {
               const isSelected = activeRoutine?.id === r.id;
@@ -84,8 +90,23 @@ export const RoutinesView: React.FC<RoutinesViewProps> = ({
                     borderLeft: `4px solid ${isSelected ? C.orange : 'transparent'}`,
                   }}
                 >
-                  <div className="font-display font-bold text-base tracking-wide" style={{ color: isSelected ? C.orange : C.text }}>
-                    {r.name.toUpperCase()}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span
+                      className="font-display font-bold text-base tracking-wide"
+                      style={{ color: isSelected ? C.orange : C.text }}
+                    >
+                      {r.name.toUpperCase()}
+                    </span>
+                    <span
+                      className="font-mono text-[9px] px-1.5 py-0.5 font-bold uppercase tracking-wider"
+                      style={
+                        r.isPredefined
+                          ? { background: C.orange + '18', color: C.orange }
+                          : { background: C.violet + '22', color: C.violet }
+                      }
+                    >
+                      {r.isPredefined ? t.predefinedBadge : t.ownBadge}
+                    </span>
                   </div>
                   <div className="font-mono text-xs mt-1" style={{ color: C.muted }}>
                     {r.exercises.length} {t.exercise.toLowerCase()} · {totalSets} {t.setsLabel.toLowerCase()}
@@ -103,6 +124,49 @@ export const RoutinesView: React.FC<RoutinesViewProps> = ({
                 <Button small C={C} onClick={() => setIsNewOpen(true)}>
                   {t.newRoutine}
                 </Button>
+              </div>
+            )}
+
+            {/* Predefined plans hidden by this user - they can be restored */}
+            {hiddenRoutines.length > 0 && (
+              <div className="pt-3 mt-1 border-t" style={{ borderColor: C.border }}>
+                <button
+                  type="button"
+                  onClick={() => setShowHidden((v) => !v)}
+                  className="font-display font-bold text-xs tracking-widest uppercase cursor-pointer"
+                  style={{ color: C.muted }}
+                >
+                  {t.hiddenRoutines} ({hiddenRoutines.length}) {showHidden ? '▾' : '▸'}
+                </button>
+
+                {showHidden && (
+                  <div className="space-y-2 mt-2">
+                    {hiddenRoutines.map((r) => (
+                      <div
+                        key={r.id}
+                        className="flex items-center justify-between gap-2 p-2.5"
+                        style={{ background: C.card, border: `1px solid ${C.border}` }}
+                      >
+                        <span
+                          className="font-display font-bold text-sm truncate"
+                          style={{ color: C.muted }}
+                        >
+                          {r.name.toUpperCase()}
+                        </span>
+                        {onRestoreRoutine && (
+                          <Button
+                            small
+                            variant="outline"
+                            onClick={() => onRestoreRoutine(r.id)}
+                            C={C}
+                          >
+                            {t.restore}
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -217,9 +281,10 @@ export const RoutinesView: React.FC<RoutinesViewProps> = ({
             routine={editingRoutine}
             allExercises={exercises}
             onSave={onSaveRoutine}
-            onClose={() => {
+            onClose={(saved) => {
               setIsNewOpen(false);
               setEditingRoutine(null);
+              if (saved?.id) setSelectedId(saved.id);
             }}
             C={C}
             t={t}
@@ -250,7 +315,9 @@ export const RoutinesView: React.FC<RoutinesViewProps> = ({
               {t.confirmDelete}
             </h3>
             <p className="font-mono text-xs mb-5" style={{ color: C.muted }}>
-              Czy na pewno chcesz usunąć ten plan treningowy? Zapisane wcześniejsze treningi pozostaną nienaruszone.
+              {routineToDelete?.isPredefined
+                ? t.deletePredefinedRoutineInfo
+                : t.deleteOwnRoutineInfo}
             </p>
             <div className="flex gap-2 justify-end">
               <Button variant="ghost" small onClick={() => setConfirmDeleteId(null)} C={C}>

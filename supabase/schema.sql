@@ -94,11 +94,36 @@ create policy "Users can CRUD their own exercise notes"
   with check (auth.uid() = user_id);
 
 
+-- Per user modification of a PREDEFINED exercise.
+-- Editing or hiding a predefined exercise never changes the shared row,
+-- the change is stored here and is visible only for that user.
+create table if not exists public.user_exercise_overrides (
+  user_id uuid references auth.users on delete cascade not null,
+  exercise_id text references public.exercises on delete cascade not null,
+  name text,
+  category text check (category in ('push', 'pull', 'legs', 'core')),
+  muscle text,
+  description text,
+  hidden boolean not null default false,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  primary key (user_id, exercise_id)
+);
+
+alter table public.user_exercise_overrides enable row level security;
+
+create policy "Users can CRUD their own exercise overrides"
+  on public.user_exercise_overrides for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+
 
 -- 3. ROUTINES (Plany treningowe)
+-- user_id = null  -> PREDEFINED plan, shared with every user
+-- user_id = user  -> PRIVATE plan, visible only for its creator
 create table if not exists public.routines (
   id uuid primary key default uuid_generate_v4(),
-  user_id uuid references auth.users on delete cascade not null default auth.uid(),
+  user_id uuid references auth.users on delete cascade null default auth.uid(),
   name text not null,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
@@ -106,8 +131,38 @@ create table if not exists public.routines (
 
 alter table public.routines enable row level security;
 
-create policy "Users can CRUD their own routines" 
-  on public.routines for all 
+create policy "Users can view predefined and own routines"
+  on public.routines for select
+  using (user_id is null or auth.uid() = user_id);
+
+create policy "Users can insert own routines"
+  on public.routines for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users can update own routines"
+  on public.routines for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create policy "Users can delete own routines"
+  on public.routines for delete
+  using (auth.uid() = user_id);
+
+
+-- Per user hiding of a PREDEFINED plan.
+-- Deleting a predefined plan only inserts a row here - the plan itself
+-- stays available for every other user.
+create table if not exists public.user_routine_hides (
+  user_id uuid references auth.users on delete cascade not null,
+  routine_id uuid references public.routines on delete cascade not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  primary key (user_id, routine_id)
+);
+
+alter table public.user_routine_hides enable row level security;
+
+create policy "Users can CRUD their own routine hides"
+  on public.user_routine_hides for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
@@ -124,17 +179,47 @@ create table if not exists public.routine_exercises (
 
 alter table public.routine_exercises enable row level security;
 
-create policy "Users can CRUD routine exercises if routine belongs to user" 
-  on public.routine_exercises for all 
+-- everybody may read the exercises of a predefined plan
+create policy "Users can view exercises of predefined and own routines"
+  on public.routine_exercises for select
   using (
     exists (
-      select 1 from public.routines r 
+      select 1 from public.routines r
+      where r.id = routine_exercises.routine_id
+        and (r.user_id is null or r.user_id = auth.uid())
+    )
+  );
+
+-- only the owner of a routine may change its exercise list
+create policy "Users can insert routine exercises of own routines"
+  on public.routine_exercises for insert
+  with check (
+    exists (
+      select 1 from public.routines r
+      where r.id = routine_exercises.routine_id and r.user_id = auth.uid()
+    )
+  );
+
+create policy "Users can update routine exercises of own routines"
+  on public.routine_exercises for update
+  using (
+    exists (
+      select 1 from public.routines r
       where r.id = routine_exercises.routine_id and r.user_id = auth.uid()
     )
   )
   with check (
     exists (
-      select 1 from public.routines r 
+      select 1 from public.routines r
+      where r.id = routine_exercises.routine_id and r.user_id = auth.uid()
+    )
+  );
+
+create policy "Users can delete routine exercises of own routines"
+  on public.routine_exercises for delete
+  using (
+    exists (
+      select 1 from public.routines r
       where r.id = routine_exercises.routine_id and r.user_id = auth.uid()
     )
   );
@@ -237,4 +322,29 @@ values
   ('lat-pd', null, 'Lat Pulldown', 'pull', 'Lats'),
   ('curl', null, 'Barbell Curl', 'pull', 'Biceps'),
   ('face-pull', null, 'Face Pull', 'pull', 'Rear Delts')
+on conflict (id) do nothing;
+
+
+-- 9. SEED PREDEFINED (SHARED) TRAINING SESSIONS
+-- user_id = null means the plan belongs to nobody and is visible for everybody.
+-- Every user can start it, edit it (creates a private copy) or hide it for
+-- themselves without affecting the other users.
+insert into public.routines (id, user_id, name) values
+  ('20000000-0000-4000-8000-000000000001', null, 'Push A'),
+  ('20000000-0000-4000-8000-000000000002', null, 'Pull A'),
+  ('20000000-0000-4000-8000-000000000003', null, 'Legs A')
+on conflict (id) do nothing;
+
+insert into public.routine_exercises (id, routine_id, exercise_id, target_sets, target_reps, sort_order) values
+  ('30000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001', 'bench', 3, 5, 0),
+  ('30000000-0000-4000-8000-000000000002', '20000000-0000-4000-8000-000000000001', 'ohp', 3, 8, 1),
+  ('30000000-0000-4000-8000-000000000003', '20000000-0000-4000-8000-000000000001', 'dip', 3, 10, 2),
+  ('30000000-0000-4000-8000-000000000004', '20000000-0000-4000-8000-000000000001', 'tricep-pd', 3, 12, 3),
+  ('30000000-0000-4000-8000-000000000005', '20000000-0000-4000-8000-000000000002', 'deadlift', 3, 5, 0),
+  ('30000000-0000-4000-8000-000000000006', '20000000-0000-4000-8000-000000000002', 'row', 3, 8, 1),
+  ('30000000-0000-4000-8000-000000000007', '20000000-0000-4000-8000-000000000002', 'pullup', 3, 8, 2),
+  ('30000000-0000-4000-8000-000000000008', '20000000-0000-4000-8000-000000000002', 'curl', 3, 12, 3),
+  ('30000000-0000-4000-8000-000000000009', '20000000-0000-4000-8000-000000000003', 'squat', 3, 5, 0),
+  ('30000000-0000-4000-8000-000000000010', '20000000-0000-4000-8000-000000000003', 'rdl', 3, 10, 1),
+  ('30000000-0000-4000-8000-000000000011', '20000000-0000-4000-8000-000000000003', 'leg-press', 3, 12, 2)
 on conflict (id) do nothing;

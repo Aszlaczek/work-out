@@ -101,6 +101,14 @@ export const ExerciseDetailModal: React.FC<ExerciseDetailModalProps> = ({
               >
                 {exercise.category}
               </span>
+              {!exercise.isCustom && exercise.isOverridden && (
+                <span
+                  className="font-display font-bold text-[10px] tracking-widest px-2 py-0.5 uppercase"
+                  style={{ background: C.violet + '22', color: C.violet }}
+                >
+                  {t.modifiedBadge}
+                </span>
+              )}
             </div>
 
             <h2 className="font-display font-black text-2xl sm:text-3xl tracking-tight" style={{ color: C.text }}>
@@ -193,16 +201,21 @@ export const ExerciseDetailModal: React.FC<ExerciseDetailModalProps> = ({
           </div>
         </div>
 
-        {/* Custom exercise extra edit mode */}
-        {exercise.isCustom && isEditingCustom && (
+        {/* Extra edit mode (custom exercise = global change, predefined = only for this user) */}
+        {isEditingCustom && (
           <form
             onSubmit={handleSaveCustomDetails}
             className="p-3.5 slide-up space-y-3"
             style={{ background: C.surface, border: `1px solid ${C.border}` }}
           >
             <span className="font-display font-bold text-xs tracking-wider uppercase" style={{ color: C.violet }}>
-              EDYTUJ DANE ĆWICZENIA WŁASNEGO
+              {exercise.isCustom ? 'EDYTUJ DANE ĆWICZENIA WŁASNEGO' : t.editOnlyForYou}
             </span>
+            {!exercise.isCustom && (
+              <p className="font-mono text-[11px] leading-relaxed" style={{ color: C.muted }}>
+                {t.editPredefinedExerciseInfo}
+              </p>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <Field label="NAZWA" value={name} onChange={setName} C={C} />
               <div>
@@ -235,37 +248,68 @@ export const ExerciseDetailModal: React.FC<ExerciseDetailModalProps> = ({
         )}
 
         {/* Footer actions */}
-        <div className="pt-3 border-t flex flex-wrap items-center justify-between gap-2" style={{ borderColor: C.border }}>
-          <div className="flex items-center gap-2">
-            {onViewProgress && (
-              <Button
-                small
-                variant="outline"
-                onClick={() => {
-                  onClose();
-                  onViewProgress(exercise.id);
-                }}
-                C={C}
-              >
-                <TrendingUp size={14} /> ZOBACZ PROGRES
-              </Button>
-            )}
+        <div className="pt-3 border-t" style={{ borderColor: C.border }}>
+          {confirmDelete ? (
+            /* Full width confirmation - keeps the text and buttons from being
+               squeezed into a narrow column next to the other footer buttons */
+            <div
+              className="w-full p-3 space-y-2"
+              style={{ background: C.surface, border: `1px solid ${C.danger}` }}
+            >
+              <p className="font-mono text-[11px] leading-relaxed" style={{ color: C.danger }}>
+                {exercise.isCustom ? t.deleteOwnExerciseInfo : t.hidePredefinedExerciseInfo}
+              </p>
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await onDeleteExercise?.(exercise.id);
+                    onClose();
+                  }}
+                  className="font-display font-bold text-[11px] px-3 py-1 bg-red-600 text-white cursor-pointer"
+                >
+                  TAK
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(false)}
+                  className="font-mono text-[11px] px-2 py-1 hover:underline cursor-pointer"
+                  style={{ color: C.muted }}
+                >
+                  NIE
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {onViewProgress && (
+                  <Button
+                    small
+                    variant="outline"
+                    onClick={() => {
+                      onClose();
+                      onViewProgress(exercise.id);
+                    }}
+                    C={C}
+                  >
+                    <TrendingUp size={14} /> ZOBACZ PROGRES
+                  </Button>
+                )}
 
-            {exercise.isCustom && !isEditingCustom && (
-              <Button
-                small
-                variant="ghost"
-                onClick={() => setIsEditingCustom(true)}
-                C={C}
-              >
-                EDYTUJ DANE
-              </Button>
-            )}
-          </div>
+                {!isEditingCustom && (
+                  <Button
+                    small
+                    variant="ghost"
+                    onClick={() => setIsEditingCustom(true)}
+                    C={C}
+                  >
+                    {exercise.isCustom ? 'EDYTUJ DANE' : t.editOnlyForYou}
+                  </Button>
+                )}
+              </div>
 
-          {exercise.isCustom && onDeleteExercise && (
-            <div>
-              {!confirmDelete ? (
+              {onDeleteExercise && (
                 <button
                   type="button"
                   onClick={() => setConfirmDelete(true)}
@@ -274,30 +318,6 @@ export const ExerciseDetailModal: React.FC<ExerciseDetailModalProps> = ({
                 >
                   <Trash2 size={13} /> {t.delete}
                 </button>
-              ) : (
-                <div className="flex items-center gap-1.5">
-                  <span className="font-mono text-[11px]" style={{ color: C.danger }}>
-                    Usunąć?
-                  </span>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await onDeleteExercise(exercise.id);
-                      onClose();
-                    }}
-                    className="font-display font-bold text-[11px] px-2 py-0.5 bg-red-600 text-white"
-                  >
-                    TAK
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmDelete(false)}
-                    className="font-mono text-[11px] hover:underline"
-                    style={{ color: C.muted }}
-                  >
-                    NIE
-                  </button>
-                </div>
               )}
             </div>
           )}

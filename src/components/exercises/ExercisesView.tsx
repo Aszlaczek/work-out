@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Colors } from '@/lib/theme';
 import { Translations } from '@/lib/i18n';
 import { Exercise, ExerciseCategory, Workout } from '@/lib/types';
@@ -11,11 +11,13 @@ import { mkId } from '@/lib/repository';
 
 interface ExercisesViewProps {
   exercises: Exercise[];
+  hiddenExercises?: Exercise[];
   workouts: Workout[];
   onAddExercise: (ex: Exercise) => Promise<void>;
   onUpdateExercise: (ex: Exercise) => Promise<void>;
   onSaveExerciseNote: (exerciseId: string, notes: string) => Promise<void>;
   onDeleteExercise: (id: string) => Promise<void>;
+  onRestoreExercise?: (id: string) => Promise<void>;
   onViewProgress?: (exerciseId: string) => void;
   C: Colors;
   t: Translations;
@@ -23,11 +25,13 @@ interface ExercisesViewProps {
 
 export const ExercisesView: React.FC<ExercisesViewProps> = ({
   exercises,
+  hiddenExercises = [],
   workouts,
   onAddExercise,
   onUpdateExercise,
   onSaveExerciseNote,
   onDeleteExercise,
+  onRestoreExercise,
   onViewProgress,
   C,
   t,
@@ -36,12 +40,18 @@ export const ExercisesView: React.FC<ExercisesViewProps> = ({
   const [catFilter, setCatFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [showHidden, setShowHidden] = useState(false);
   const [name, setName] = useState('');
   const [cat, setCat] = useState<ExerciseCategory>('push');
   const [muscle, setMuscle] = useState('');
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Nothing is hidden anymore -> go back to the normal library view
+  useEffect(() => {
+    if (showHidden && hiddenExercises.length === 0) setShowHidden(false);
+  }, [showHidden, hiddenExercises.length]);
 
   const categories: { val: string; label: string }[] = [
     { val: 'all', label: t.allEx },
@@ -189,9 +199,25 @@ export const ExercisesView: React.FC<ExercisesViewProps> = ({
             </button>
           ))}
 
+          {hiddenExercises.length > 0 && (
+            <button
+              onClick={() => setShowHidden((v) => !v)}
+              className="font-display font-bold text-xs tracking-widest px-3 py-1.5 ml-auto transition-all cursor-pointer select-none"
+              style={{
+                background: showHidden ? C.danger : C.card,
+                color: showHidden ? '#ffffff' : C.muted,
+                border: `1px solid ${showHidden ? C.danger : C.border}`,
+              }}
+            >
+              {t.hiddenExercises} ({hiddenExercises.length})
+            </button>
+          )}
+
           <button
             onClick={() => setFilter(filter === 'all' ? 'custom' : 'all')}
-            className="font-display font-bold text-xs tracking-widest px-3 py-1.5 ml-auto transition-all cursor-pointer select-none"
+            className={`font-display font-bold text-xs tracking-widest px-3 py-1.5 transition-all cursor-pointer select-none ${
+              hiddenExercises.length > 0 ? 'ml-2' : 'ml-auto'
+            }`}
             style={{
               background: filter === 'custom' ? C.violet : C.card,
               color: filter === 'custom' ? '#ffffff' : C.muted,
@@ -202,7 +228,58 @@ export const ExercisesView: React.FC<ExercisesViewProps> = ({
           </button>
         </div>
 
+        {/* Hidden predefined exercises - hidden only for this user, restorable */}
+        {showHidden && (
+          <div className="space-y-2">
+            {hiddenExercises.map((e) => (
+              <div
+                key={e.id}
+                className="p-3.5 sm:p-4 flex items-center justify-between gap-3"
+                style={{
+                  background: C.card,
+                  border: `1px solid ${C.border}`,
+                  borderLeft: `3px solid ${C.dim}`,
+                  opacity: 0.8,
+                }}
+              >
+                <div className="flex-1 min-w-0">
+                  <span
+                    className="font-display font-bold text-base sm:text-lg truncate"
+                    style={{ color: C.text }}
+                  >
+                    {e.name}
+                  </span>
+                  <div className="flex items-center gap-2 font-mono text-xs" style={{ color: C.muted }}>
+                    <span>{e.muscle}</span>
+                    <span>·</span>
+                    <span className="uppercase">{e.category}</span>
+                  </div>
+                  <p className="font-mono text-[11px] mt-1.5" style={{ color: C.muted }}>
+                    {t.hidePredefinedExerciseInfo}
+                  </p>
+                </div>
+
+                {onRestoreExercise && (
+                  <Button small variant="outline" onClick={() => onRestoreExercise(e.id)} C={C}>
+                    {t.restore}
+                  </Button>
+                )}
+              </div>
+            ))}
+
+            {hiddenExercises.length === 0 && (
+              <div
+                className="p-8 text-center border border-dashed"
+                style={{ borderColor: C.border, color: C.muted }}
+              >
+                <p className="font-mono text-xs">—</p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Exercises List - Clicking any item opens its description/details */}
+        {!showHidden && (
         <div className="space-y-2">
           {visible.map((e) => (
             <div
@@ -232,6 +309,14 @@ export const ExercisesView: React.FC<ExercisesViewProps> = ({
                       style={{ background: C.violet + '22', color: C.violet }}
                     >
                       CUSTOM
+                    </span>
+                  )}
+                  {!e.isCustom && e.isOverridden && (
+                    <span
+                      className="font-mono text-[9px] px-1.5 py-0.5 font-bold uppercase tracking-wider"
+                      style={{ background: C.orange + '18', color: C.orange }}
+                    >
+                      {t.modifiedBadge}
                     </span>
                   )}
                   {e.notes && (
@@ -276,6 +361,7 @@ export const ExercisesView: React.FC<ExercisesViewProps> = ({
             </div>
           )}
         </div>
+        )}
 
         {/* Exercise Detail & Description Modal */}
         {selectedExercise && (
@@ -283,7 +369,12 @@ export const ExercisesView: React.FC<ExercisesViewProps> = ({
             exercise={selectedExercise}
             workouts={workouts}
             onSaveNote={handleSaveNoteModal}
-            onUpdateCustomExercise={onUpdateExercise}
+            onUpdateCustomExercise={async (updated) => {
+              await onUpdateExercise(updated);
+              setSelectedExercise((prev) =>
+                prev && prev.id === updated.id ? updated : prev,
+              );
+            }}
             onDeleteExercise={onDeleteExercise}
             onViewProgress={onViewProgress}
             onClose={() => setSelectedExercise(null)}

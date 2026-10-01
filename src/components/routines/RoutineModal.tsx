@@ -11,8 +11,8 @@ import { mkId } from '@/lib/repository';
 interface RoutineModalProps {
   routine?: Routine | null;
   allExercises: Exercise[];
-  onSave: (routine: Routine) => Promise<void>;
-  onClose: () => void;
+  onSave: (routine: Routine) => Promise<Routine>;
+  onClose: (saved?: Routine) => void;
   C: Colors;
   t: Translations;
 }
@@ -71,9 +71,13 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
         id: routine?.id || mkId(),
         name: name.trim(),
         exercises,
+        // editing a predefined plan produces a private copy of it
+        isPredefined: routine?.isPredefined ?? false,
       };
-      await onSave(routineToSave);
-      onClose();
+      const saved = await onSave(routineToSave);
+      onClose(saved);
+    } catch {
+      // the error is already reported in the app banner, the modal stays open
     } finally {
       setSaving(false);
     }
@@ -95,7 +99,7 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
           </h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => onClose()}
             className="font-mono text-sm p-1 cursor-pointer hover:opacity-75"
             style={{ color: C.muted }}
           >
@@ -112,6 +116,12 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
           required
           C={C}
         />
+
+        {!isNew && routine?.isPredefined && (
+          <p className="font-mono text-xs leading-relaxed" style={{ color: C.orange }}>
+            {t.editPredefinedInfo}
+          </p>
+        )}
 
         {/* Exercises included in routine */}
         <div>
@@ -216,7 +226,7 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
 
         {/* Actions */}
         <div className="pt-3 border-t flex justify-end gap-2" style={{ borderColor: C.border }}>
-          <Button variant="ghost" small onClick={onClose} C={C}>
+          <Button variant="ghost" small onClick={() => onClose()} C={C}>
             {t.cancel}
           </Button>
           <Button

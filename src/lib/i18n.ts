@@ -34,6 +34,17 @@ export const T = {
     emailExists: "Konto z tym adresem już istnieje.",
     invalidLogin: "Nieprawidłowy e-mail lub hasło.",
 
+    // email confirmation
+    confirmEmailTitle: "Potwierdź swój e-mail",
+    confirmEmailIntro: "Wysłaliśmy link potwierdzający na adres",
+    confirmEmailHint:
+      "Kliknij link w wiadomości, aby aktywować konto. Aplikacja zaczeka z logowaniem — po potwierdzeniu wróć tutaj i zaloguj się.",
+    emailNotConfirmed: "To konto nie jest jeszcze potwierdzone. Otwórz link wysłany na adres e-mail.",
+    resendConfirmBtn: "WYŚLIJ LINK PONOWNIE",
+    resendConfirmSent: "Link potwierdzający został wysłany ponownie.",
+    demoConfirmLink: "OTWÓRZ LINK POTWIERDZAJĄCY (DEMO)",
+    accountConfirmed: "Konto potwierdzone! Możesz się teraz zalogować.",
+
     // dashboard
     today: "DZISIAJ",
     quickStart: "SZYBKI START",
@@ -67,6 +78,23 @@ export const T = {
     scheduleWorkout: "ZAPLANUJ NA DZIEŃ",
     planned: "ZAPLANOWANY",
 
+    // routine visibility (predefined = shared, private = own)
+    availableRoutines: "DOSTĘPNE PLANY",
+    hiddenRoutines: "UKRYTE PLANY",
+    restore: "PRZYWRÓĆ",
+    predefinedBadge: "PREDEFINIOWANE",
+    ownBadge: "TWÓJ PLAN",
+    deletePredefinedRoutineInfo:
+      "Ten plan jest predefiniowany i wspólny dla wszystkich użytkowników. Usunięcie ukryje go tylko u Ciebie — inni użytkownicy nadal będą go widzieć.",
+    deleteOwnRoutineInfo:
+      "Czy na pewno chcesz usunąć swój plan treningowy? Zapisane wcześniejsze treningi pozostaną nienaruszone.",
+    editPredefinedInfo:
+      "Edycja planu predefiniowanego utworzy jego prywatną kopię tylko dla Ciebie. Oryginał pozostanie dostępny dla pozostałych użytkowników.",
+
+    // save/delete errors (nothing was changed when this shows up)
+    syncErrorTitle: "Nie udało się zapisać zmiany",
+    syncErrorHint: "Nic nie zostało usunięte ani zmienione — spróbuj ponownie.",
+
     // exercises
     exercisesTitle: "BAZA ĆWICZEŃ",
     newExercise: "NOWE ĆWICZENIE",
@@ -80,6 +108,17 @@ export const T = {
     customOnly: "WŁASNE",
     allEx: "WSZYSTKIE",
     searchExercise: "Szukaj ćwiczenia…",
+
+    // exercise visibility (predefined = shared, custom = only for creator)
+    hiddenExercises: "UKRYTE",
+    modifiedBadge: "ZMODYFIKOWANE",
+    editOnlyForYou: "EDYTUJ (TYLKO DLA CIEBIE)",
+    hidePredefinedExerciseInfo:
+      "To ćwiczenie jest predefiniowane. Ukrycie działa tylko u Ciebie — inne konta nadal będą je widzieć.",
+    editPredefinedExerciseInfo:
+      "Ta modyfikacja zapisze się wyłącznie na Twoim koncie — pozostali użytkownicy widzą oryginalne ćwiczenie.",
+    deleteOwnExerciseInfo: "Usunąć to ćwiczenie na stałe? Widoczne jest tylko u Ciebie.",
+    hiddenOnlyForYou: "Ukryć to ćwiczenie tylko u siebie?",
 
     // workout logger
     activeTraining: "AKTYWNY TRENING",
@@ -169,6 +208,16 @@ export const T = {
     emailExists: "An account with this email already exists.",
     invalidLogin: "Invalid email or password.",
 
+    confirmEmailTitle: "Confirm your e-mail",
+    confirmEmailIntro: "We sent a confirmation link to",
+    confirmEmailHint:
+      "Click the link in the message to activate your account. The application waits for the confirmation — after confirming, come back here and log in.",
+    emailNotConfirmed: "This account is not confirmed yet. Open the link sent to your e-mail address.",
+    resendConfirmBtn: "RESEND LINK",
+    resendConfirmSent: "The confirmation link has been sent again.",
+    demoConfirmLink: "OPEN CONFIRMATION LINK (DEMO)",
+    accountConfirmed: "Account confirmed! You can log in now.",
+
     today: "TODAY",
     quickStart: "QUICK START",
     history: "WORKOUT HISTORY",
@@ -200,6 +249,21 @@ export const T = {
     scheduleWorkout: "SCHEDULE FOR DATE",
     planned: "PLANNED",
 
+    availableRoutines: "AVAILABLE ROUTINES",
+    hiddenRoutines: "HIDDEN ROUTINES",
+    restore: "RESTORE",
+    predefinedBadge: "PREDEFINED",
+    ownBadge: "YOUR PLAN",
+    deletePredefinedRoutineInfo:
+      "This plan is predefined and shared by every user. Deleting it hides it only for you — other users will still see it.",
+    deleteOwnRoutineInfo:
+      "Are you sure you want to delete your routine? Previously saved workouts will stay untouched.",
+    editPredefinedInfo:
+      "Editing a predefined plan creates a private copy just for you. The original stays available for other users.",
+
+    syncErrorTitle: "The change was not saved",
+    syncErrorHint: "Nothing was removed or changed — please try again.",
+
     exercisesTitle: "EXERCISE DATABASE",
     newExercise: "NEW EXERCISE",
     exName: "NAME",
@@ -212,6 +276,16 @@ export const T = {
     customOnly: "CUSTOM",
     allEx: "ALL",
     searchExercise: "Search exercise…",
+
+    hiddenExercises: "HIDDEN",
+    modifiedBadge: "MODIFIED",
+    editOnlyForYou: "EDIT (ONLY FOR YOU)",
+    hidePredefinedExerciseInfo:
+      "This exercise is predefined. Hiding it works only for you — other accounts will still see it.",
+    editPredefinedExerciseInfo:
+      "This change is saved only on your account — other users keep the original exercise.",
+    deleteOwnExerciseInfo: "Delete this exercise permanently? It is visible only to you.",
+    hiddenOnlyForYou: "Hide this exercise only for yourself?",
 
     activeTraining: "ACTIVE WORKOUT",
     finish: "FINISH & SAVE",

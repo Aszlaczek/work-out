@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Colors } from '@/lib/theme';
 
 interface ModalProps {
@@ -22,7 +23,13 @@ export const Modal: React.FC<ModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  return (
+  // Rendered directly in <body>. Views live inside <main className="z-10">,
+  // and a child can never paint above an element (the mobile bottom nav, z-40)
+  // that sits in a higher stacking context - otherwise the modal footer would
+  // be covered by the bottom navigation.
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 transition-all"
       style={{ background: 'rgba(5, 5, 18, 0.75)', backdropFilter: 'blur(4px)' }}
@@ -39,6 +46,7 @@ export const Modal: React.FC<ModalProps> = ({
       >
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };

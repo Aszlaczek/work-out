@@ -39,6 +39,10 @@ export default function Home() {
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [hiddenRoutines, setHiddenRoutines] = useState<Routine[]>([]);
+  const [hiddenExercises, setHiddenExercises] = useState<Exercise[]>([]);
+  // set whenever a write to the database failed - nothing was changed then
+  const [dataError, setDataError] = useState<string | null>(null);
   const [activeWorkout, setActiveWorkout] = useState<ActiveWorkout | null>(
     null,
   );
@@ -95,15 +99,29 @@ export default function Home() {
 
   // Load data for active user
   const loadUserData = useCallback(async (userId?: string) => {
-    const [fetchedRoutines, fetchedWorkouts, fetchedExercises] =
-      await Promise.all([
+    try {
+      const [
+        fetchedRoutines,
+        fetchedWorkouts,
+        fetchedExercises,
+        fetchedHiddenRoutines,
+        fetchedHiddenExercises,
+      ] = await Promise.all([
         repository.getRoutines(userId),
         repository.getWorkouts(userId),
         repository.getExercises(userId),
+        repository.getHiddenRoutines(userId),
+        repository.getHiddenExercises(userId),
       ]);
-    setRoutines(fetchedRoutines);
-    setWorkouts(fetchedWorkouts);
-    setExercises(fetchedExercises);
+      setRoutines(fetchedRoutines);
+      setWorkouts(fetchedWorkouts);
+      setExercises(fetchedExercises);
+      setHiddenRoutines(fetchedHiddenRoutines);
+      setHiddenExercises(fetchedHiddenExercises);
+    } catch (e) {
+      console.error("[data] loading failed:", e);
+      setDataError(e instanceof Error ? e.message : String(e));
+    }
   }, []);
 
   useEffect(() => {
@@ -138,6 +156,14 @@ export default function Home() {
     setView("workout");
   };
 
+  // A failed write must never change the UI, otherwise the deleted item would
+  // simply come back after the next reload.
+  const reportError = (e: unknown) => {
+    const message = e instanceof Error ? e.message : String(e);
+    console.error("[data] operation failed:", message);
+    setDataError(message);
+  };
+
   // Finish and save live workout to Supabase
   const handleFinishActiveWorkout = async () => {
     if (!activeWorkout) return;
@@ -166,11 +192,17 @@ export default function Home() {
       })),
     };
 
-    await repository.saveWorkout(newWorkout, user?.id);
-    setWorkouts((prev) => [newWorkout, ...prev]);
-    setActiveWorkout(null);
-    localStorage.removeItem("gp_active_workout");
-    setView("dashboard");
+    try {
+      const saved = await repository.saveWorkout(newWorkout, user?.id);
+      setWorkouts((prev) => [saved, ...prev]);
+      setActiveWorkout(null);
+      localStorage.removeItem("gp_active_workout");
+      setDataError(null);
+      setView("dashboard");
+    } catch (e) {
+      // the active workout stays so the training can be saved again
+      reportError(e);
+    }
   };
 
   const handleDiscardActiveWorkout = () => {
@@ -181,57 +213,166 @@ export default function Home() {
 
   // Save updated workout ("Uaktualnienie swojego treningu")
   const handleSaveUpdatedWorkout = async (updated: Workout) => {
-    await repository.saveWorkout(updated, user?.id);
-    setWorkouts((prev) => prev.map((w) => (w.id === updated.id ? updated : w)));
+    try {
+      const saved = await repository.saveWorkout(updated, user?.id);
+      setWorkouts((prev) => prev.map((w) => (w.id === updated.id ? saved : w)));
+      setDataError(null);
+    } catch (e) {
+      reportError(e);
+    }
   };
 
   // Delete workout
   const handleDeleteWorkout = async (workoutId: string) => {
-    await repository.deleteWorkout(workoutId, user?.id);
-    setWorkouts((prev) => prev.filter((w) => w.id !== workoutId));
+    try {
+      await repository.deleteWorkout(workoutId, user?.id);
+      setWorkouts((prev) => prev.filter((w) => w.id !== workoutId));
+      setDataError(null);
+    } catch (e) {
+      reportError(e);
+    }
   };
 
-  // Save or update routine ("Planowanie")
-  const handleSaveRoutine = async (routine: Routine) => {
-    await repository.saveRoutine(routine, user?.id);
-    setRoutines((prev) => {
-      const idx = prev.findIndex((r) => r.id === routine.id);
-      if (idx >= 0) {
-        return prev.map((r) => (r.id === routine.id ? routine : r));
+  // Save or update routine ("Planowanie").
+  // Saving a predefined routine returns a new private copy of it.
+  const handleSaveRoutine = async (routine: Routine): Promise<Routine> => {
+    try {
+      const saved = await repository.saveRoutine(routine, user?.id);
+      setRoutines((prev) => {
+        const originalIndex = prev.findIndex((r) => r.id === routine.id);
+        const next = prev.filter((r) => r.id !== routine.id && r.id !== saved.id);
+        const insertAt =
+          originalIndex >= 0 ? Math.min(originalIndex, next.length) : next.length;
+        next.splice(insertAt, 0, saved);
+        return next;
+      });
+
+      // Editing a predefined plan hides the shared original for this user only
+      if (routine.isPredefined && saved.id !== routine.id) {
+        setHiddenRoutines((prev) =>
+          prev.some((r) => r.id === routine.id)
+            ? prev
+            : [...prev, { ...routine, isPredefined: true }],
+        );
       }
-      return [...prev, routine];
-    });
+      setDataError(null);
+      return saved;
+    } catch (e) {
+      reportError(e);
+      // the modal must not close with a routine that was never saved
+      throw e;
+    }
   };
 
-  // Delete routine
+  // Delete routine: predefined plans are only hidden for this user
   const handleDeleteRoutine = async (routineId: string) => {
-    await repository.deleteRoutine(routineId, user?.id);
-    setRoutines((prev) => prev.filter((r) => r.id !== routineId));
+    try {
+      const routine = routines.find((r) => r.id === routineId);
+      const isPredefined = !!routine?.isPredefined;
+      await repository.deleteRoutine(routineId, user?.id, isPredefined);
+      setRoutines((prev) => prev.filter((r) => r.id !== routineId));
+      if (isPredefined && routine) {
+        setHiddenRoutines((prev) =>
+          prev.some((r) => r.id === routineId)
+            ? prev
+            : [...prev, { ...routine, isPredefined: true }],
+        );
+      }
+      setDataError(null);
+    } catch (e) {
+      reportError(e);
+    }
+  };
+
+  const handleRestoreRoutine = async (routineId: string) => {
+    try {
+      await repository.restoreRoutine(routineId, user?.id);
+      setHiddenRoutines((prev) => prev.filter((r) => r.id !== routineId));
+      const restored = hiddenRoutines.find((r) => r.id === routineId);
+      if (restored) {
+        setRoutines((prev) => {
+          const insertAt = prev.findIndex((r) => !r.isPredefined);
+          const next = [...prev];
+          next.splice(insertAt >= 0 ? insertAt : next.length, 0, {
+            ...restored,
+            isPredefined: true,
+          });
+          return next;
+        });
+      }
+      setDataError(null);
+    } catch (e) {
+      reportError(e);
+    }
   };
 
   // Custom exercise actions
   const handleAddExercise = async (ex: Exercise) => {
-    await repository.saveExercise(ex, user?.id);
-    setExercises((prev) => [...prev, ex]);
+    try {
+      const saved = await repository.saveExercise(ex, user?.id);
+      setExercises((prev) => [...prev, saved]);
+      setDataError(null);
+    } catch (e) {
+      reportError(e);
+    }
   };
 
   const handleUpdateExercise = async (updated: Exercise) => {
-    await repository.saveExercise(updated, user?.id);
-    setExercises((prev) =>
-      prev.map((e) => (e.id === updated.id ? updated : e)),
-    );
+    try {
+      const saved = await repository.saveExercise(updated, user?.id);
+      setExercises((prev) =>
+        prev.map((e) => (e.id === saved.id ? saved : e)),
+      );
+      setDataError(null);
+    } catch (e) {
+      reportError(e);
+    }
   };
 
   const handleSaveExerciseNote = async (exerciseId: string, notes: string) => {
-    await repository.saveExerciseNote(exerciseId, notes, user?.id);
-    setExercises((prev) =>
-      prev.map((e) => (e.id === exerciseId ? { ...e, notes } : e)),
-    );
+    try {
+      await repository.saveExerciseNote(exerciseId, notes, user?.id);
+      setExercises((prev) =>
+        prev.map((e) => (e.id === exerciseId ? { ...e, notes } : e)),
+      );
+      setDataError(null);
+    } catch (e) {
+      reportError(e);
+    }
   };
 
+  // Custom exercises are removed permanently, predefined ones are only hidden
+  // for the current user (other users keep seeing them)
   const handleDeleteExercise = async (exId: string) => {
-    await repository.deleteExercise(exId, user?.id);
-    setExercises((prev) => prev.filter((e) => e.id !== exId));
+    try {
+      const exercise = exercises.find((e) => e.id === exId);
+      const isCustom = !!exercise?.isCustom;
+      await repository.deleteExercise(exId, user?.id, isCustom);
+      setExercises((prev) => prev.filter((e) => e.id !== exId));
+      if (!isCustom && exercise) {
+        setHiddenExercises((prev) =>
+          prev.some((e) => e.id === exId) ? prev : [...prev, exercise],
+        );
+      }
+      setDataError(null);
+    } catch (e) {
+      reportError(e);
+    }
+  };
+
+  const handleRestoreExercise = async (exId: string) => {
+    try {
+      await repository.restoreExercise(exId, user?.id);
+      setHiddenExercises((prev) => prev.filter((e) => e.id !== exId));
+      const restored = hiddenExercises.find((e) => e.id === exId);
+      if (restored) {
+        const refreshed = await repository.getExercises(user?.id);
+        setExercises(refreshed);
+      }
+      setDataError(null);
+    } catch (e) {
+      reportError(e);
+    }
   };
 
   // Auth actions
@@ -286,6 +427,45 @@ export default function Home() {
     >
       <AmbientBlobs C={C} />
 
+      {/* Failed write: nothing changed, the item stays where it was */}
+      {dataError && (
+        <div
+          className="fixed top-3 left-1/2 -translate-x-1/2 z-[80] p-3 flex items-start gap-3 w-[min(94vw,540px)]"
+          style={{
+            background: C.card,
+            border: `1px solid ${C.danger}`,
+            borderRadius: 10,
+            boxShadow: "0 10px 34px rgba(0,0,0,.4)",
+          }}
+        >
+          <div className="flex-1 min-w-0">
+            <p
+              className="font-display font-bold text-xs tracking-widest"
+              style={{ color: C.danger }}
+            >
+              {t.syncErrorTitle}
+            </p>
+            <p className="font-mono text-[11px] mt-1" style={{ color: C.muted }}>
+              {t.syncErrorHint}
+            </p>
+            <p
+              className="font-mono text-[11px] mt-1 break-words"
+              style={{ color: C.text }}
+            >
+              {dataError}
+            </p>
+          </div>
+          <button
+            onClick={() => setDataError(null)}
+            className="font-mono text-base leading-none px-2 cursor-pointer"
+            style={{ color: C.muted }}
+            aria-label="close"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       {/* Desktop Header Navigation */}
       <Header
         view={view}
@@ -331,11 +511,13 @@ export default function Home() {
         {view === "routines" && (
           <RoutinesView
             routines={routines}
+            hiddenRoutines={hiddenRoutines}
             exercises={exercises}
             hasActiveWorkout={!!activeWorkout}
             onStartWorkout={handleStartWorkout}
             onSaveRoutine={handleSaveRoutine}
             onDeleteRoutine={handleDeleteRoutine}
+            onRestoreRoutine={handleRestoreRoutine}
             C={C}
             t={t}
           />
@@ -344,11 +526,13 @@ export default function Home() {
         {view === "exercises" && (
           <ExercisesView
             exercises={exercises}
+            hiddenExercises={hiddenExercises}
             workouts={workouts}
             onAddExercise={handleAddExercise}
             onUpdateExercise={handleUpdateExercise}
             onSaveExerciseNote={handleSaveExerciseNote}
             onDeleteExercise={handleDeleteExercise}
+            onRestoreExercise={handleRestoreExercise}
             onViewProgress={() => setView("progress")}
             C={C}
             t={t}
@@ -445,8 +629,13 @@ export default function Home() {
           routines={routines}
           exercises={exercises}
           onSave={async (newWorkout) => {
-            await repository.saveWorkout(newWorkout, user.id);
-            setWorkouts((prev) => [newWorkout, ...prev]);
+            try {
+              const saved = await repository.saveWorkout(newWorkout, user.id);
+              setWorkouts((prev) => [saved, ...prev]);
+              setDataError(null);
+            } catch (e) {
+              reportError(e);
+            }
           }}
           onClose={() => setIsManualLogOpen(false)}
           C={C}

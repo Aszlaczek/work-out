@@ -6,6 +6,8 @@ export type Exercise = {
   category: ExerciseCategory;
   muscle: string;
   isCustom?: boolean;
+  // true when the user modified a predefined exercise (change is visible only for this user)
+  isOverridden?: boolean;
   description?: string;
   notes?: string;
 };
@@ -46,6 +48,9 @@ export type Routine = {
   id: string;
   name: string;
   exercises: RoutineExercise[];
+  // true = predefined plan shared with every user (can only be hidden per user,
+  // editing it creates a private copy)
+  isPredefined?: boolean;
 };
 
 export type ActiveSet = {

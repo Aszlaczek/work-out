@@ -34,19 +34,36 @@ export const AuthView: React.FC<AuthViewProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resetSent, setResetSent] = useState(false);
+  // e-mail of the account that is waiting for confirmation via the e-mail link
+  const [pendingConfirmation, setPendingConfirmation] = useState<string | null>(null);
+  const [confirmNotice, setConfirmNotice] = useState<string | null>(null);
+  const [resending, setResending] = useState(false);
 
   const t = T[lang];
   const isCloud = repository.isCloudConnected();
 
+  const backToLogin = () => {
+    setError(null);
+    setConfirmNotice(null);
+    setPendingConfirmation(null);
+    setResetSent(false);
+    setTab('login');
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setConfirmNotice(null);
     setLoading(true);
 
     try {
       const res = await repository.signIn(email.trim(), password);
       if (res.error) {
         setError(res.error);
+      } else if (res.needsConfirmation) {
+        // The application waits until the user confirms the e-mail address
+        setConfirmNotice(t.emailNotConfirmed);
+        setPendingConfirmation(email.trim());
       } else if (res.user) {
         onLoginSuccess(res.user);
       }
@@ -60,6 +77,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setConfirmNotice(null);
 
     if (password.length < 6) {
       setError(t.shortPassword);
@@ -75,6 +93,10 @@ export const AuthView: React.FC<AuthViewProps> = ({
       const res = await repository.signUp(email.trim(), password);
       if (res.error) {
         setError(res.error);
+      } else if (res.needsConfirmation) {
+        // Account created, but nobody gets in before the e-mail link is used
+        setConfirmNotice(null);
+        setPendingConfirmation(email.trim());
       } else if (res.user) {
         onLoginSuccess(res.user);
       }
@@ -82,6 +104,37 @@ export const AuthView: React.FC<AuthViewProps> = ({
       setError(err?.message || 'Wystąpił błąd rejestracji.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    if (!pendingConfirmation) return;
+    setError(null);
+    setResending(true);
+    try {
+      const res = await repository.resendConfirmation(pendingConfirmation);
+      if (res.error) setError(res.error);
+      else setConfirmNotice(t.resendConfirmSent);
+    } catch (err: any) {
+      setError(err?.message || 'Błąd wysyłania linku.');
+    } finally {
+      setResending(false);
+    }
+  };
+
+  // Local/demo mode has no real mailbox - the confirmation link is shown in the app
+  const handleDemoConfirmation = async () => {
+    if (!pendingConfirmation) return;
+    setError(null);
+    const ok = await repository.confirmLocalAccount(pendingConfirmation);
+    if (ok) {
+      setConfirmNotice(t.accountConfirmed);
+      setPendingConfirmation(null);
+      setTab('login');
+      setPassword('');
+      setPasswordConfirm('');
+    } else {
+      setError(t.invalidLogin);
     }
   };
 
@@ -172,7 +225,63 @@ export const AuthView: React.FC<AuthViewProps> = ({
             borderTop: `3px solid ${C.orange}`,
           }}
         >
-          {tab === 'login' && (
+          {pendingConfirmation && (
+            <div className="space-y-4 slide-up">
+              <h2 className="font-display font-black text-2xl tracking-tight" style={{ color: C.text }}>
+                {t.confirmEmailTitle}
+              </h2>
+
+              <p className="font-mono text-sm" style={{ color: C.text }}>
+                {t.confirmEmailIntro}{' '}
+                <span className="font-bold break-all" style={{ color: C.orange }}>
+                  {pendingConfirmation}
+                </span>
+              </p>
+
+              <p className="font-mono text-xs leading-relaxed" style={{ color: C.muted }}>
+                {t.confirmEmailHint}
+              </p>
+
+              {confirmNotice && (
+                <div
+                  className="p-2.5 font-mono text-xs"
+                  style={{ background: '#34d39918', color: '#34d399', borderLeft: '2px solid #34d399' }}
+                >
+                  {confirmNotice}
+                </div>
+              )}
+
+              {error && (
+                <div
+                  className="p-2.5 font-mono text-xs"
+                  style={{ background: C.danger + '18', color: C.danger, borderLeft: `2px solid ${C.danger}` }}
+                >
+                  {error}
+                </div>
+              )}
+
+              <Button onClick={handleResendConfirmation} disabled={resending} C={C} fullWidth>
+                {resending ? '...' : t.resendConfirmBtn}
+              </Button>
+
+              {!isCloud && (
+                <Button variant="violet" onClick={handleDemoConfirmation} C={C} fullWidth small>
+                  {t.demoConfirmLink}
+                </Button>
+              )}
+
+              <button
+                type="button"
+                onClick={backToLogin}
+                className="block font-mono text-xs mt-2 hover:underline cursor-pointer w-full text-center"
+                style={{ color: C.muted }}
+              >
+                ← {t.backToLogin}
+              </button>
+            </div>
+          )}
+
+          {!pendingConfirmation && tab === 'login' && (
             <form onSubmit={handleLogin} className="space-y-4">
               <h2 className="font-display font-black text-2xl tracking-tight" style={{ color: C.text }}>
                 {t.loginTitle}
@@ -194,6 +303,15 @@ export const AuthView: React.FC<AuthViewProps> = ({
                 required
                 C={C}
               />
+
+              {confirmNotice && !error && (
+                <div
+                  className="p-2.5 font-mono text-xs"
+                  style={{ background: '#34d39918', color: '#34d399', borderLeft: '2px solid #34d399' }}
+                >
+                  {confirmNotice}
+                </div>
+              )}
 
               {error && (
                 <div
@@ -254,7 +372,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
             </form>
           )}
 
-          {tab === 'register' && (
+          {!pendingConfirmation && tab === 'register' && (
             <form onSubmit={handleRegister} className="space-y-4">
               <h2 className="font-display font-black text-2xl tracking-tight" style={{ color: C.text }}>
                 {t.registerTitle}
@@ -318,7 +436,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
             </form>
           )}
 
-          {tab === 'forgot' && (
+          {!pendingConfirmation && tab === 'forgot' && (
             <form onSubmit={handleForgot} className="space-y-4">
               <h2 className="font-display font-black text-2xl tracking-tight" style={{ color: C.text }}>
                 {t.forgotTitle}
