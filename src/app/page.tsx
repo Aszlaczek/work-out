@@ -27,6 +27,7 @@ import { WorkoutEditModal } from "@/components/workouts/WorkoutEditModal";
 import { WorkoutDetailModal } from "@/components/workouts/WorkoutDetailModal";
 import { ManualWorkoutModal } from "@/components/workouts/ManualWorkoutModal";
 import { RoutineModal } from "@/components/routines/RoutineModal";
+import { Analytics } from "@vercel/analytics/next";
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
@@ -65,7 +66,9 @@ export default function Home() {
     // set before the application lets anybody in. The recovery tokens in the
     // url are kept so /reset-password can pick them up.
     if (repository.hasPendingPasswordReset()) {
-      window.location.replace("/reset-password" + window.location.search + window.location.hash);
+      window.location.replace(
+        "/reset-password" + window.location.search + window.location.hash,
+      );
       return;
     }
     setMounted(true);
@@ -260,9 +263,13 @@ export default function Home() {
       const saved = await repository.saveRoutine(routine, user?.id);
       setRoutines((prev) => {
         const originalIndex = prev.findIndex((r) => r.id === routine.id);
-        const next = prev.filter((r) => r.id !== routine.id && r.id !== saved.id);
+        const next = prev.filter(
+          (r) => r.id !== routine.id && r.id !== saved.id,
+        );
         const insertAt =
-          originalIndex >= 0 ? Math.min(originalIndex, next.length) : next.length;
+          originalIndex >= 0
+            ? Math.min(originalIndex, next.length)
+            : next.length;
         next.splice(insertAt, 0, saved);
         return next;
       });
@@ -340,9 +347,7 @@ export default function Home() {
   const handleUpdateExercise = async (updated: Exercise) => {
     try {
       const saved = await repository.saveExercise(updated, user?.id);
-      setExercises((prev) =>
-        prev.map((e) => (e.id === saved.id ? saved : e)),
-      );
+      setExercises((prev) => prev.map((e) => (e.id === saved.id ? saved : e)));
       setDataError(null);
     } catch (e) {
       reportError(e);
@@ -447,6 +452,7 @@ export default function Home() {
       className="flex flex-col min-h-[100dvh] relative overflow-hidden"
       style={{ background: C.bg, color: C.text }}
     >
+      <Analytics />
       <AmbientBlobs C={C} />
 
       {/* Failed write: nothing changed, the item stays where it was */}
@@ -467,7 +473,10 @@ export default function Home() {
             >
               {t.syncErrorTitle}
             </p>
-            <p className="font-mono text-[11px] mt-1" style={{ color: C.muted }}>
+            <p
+              className="font-mono text-[11px] mt-1"
+              style={{ color: C.muted }}
+            >
               {t.syncErrorHint}
             </p>
             <p
