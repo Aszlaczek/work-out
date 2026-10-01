@@ -31,6 +31,8 @@ import { RoutineModal } from "@/components/routines/RoutineModal";
 export default function Home() {
   const [mounted, setMounted] = useState(false);
   const [user, setUser] = useState<AppUser | null>(null);
+  // The Supabase session died while the app was open - the login screen shows why
+  const [sessionExpired, setSessionExpired] = useState(false);
   const [theme, setTheme] = useState<Theme>("dark");
   const [lang, setLang] = useState<Lang>("pl");
   const [view, setView] = useState<ViewType>("dashboard");
@@ -59,6 +61,13 @@ export default function Home() {
 
   // Load initial settings and active user
   useEffect(() => {
+    // A password reset was started on this device - a new password has to be
+    // set before the application lets anybody in. The recovery tokens in the
+    // url are kept so /reset-password can pick them up.
+    if (repository.hasPendingPasswordReset()) {
+      window.location.replace("/reset-password" + window.location.search + window.location.hash);
+      return;
+    }
     setMounted(true);
     const savedTheme = localStorage.getItem("gp_theme") as Theme;
     if (savedTheme === "dark" || savedTheme === "light") setTheme(savedTheme);
@@ -120,7 +129,18 @@ export default function Home() {
       setHiddenExercises(fetchedHiddenExercises);
     } catch (e) {
       console.error("[data] loading failed:", e);
-      setDataError(e instanceof Error ? e.message : String(e));
+      const message = e instanceof Error ? e.message : String(e);
+      if ((e as { sessionExpired?: boolean })?.sessionExpired) {
+        // A stale session cannot be repaired by the user inside the app:
+        // end it cleanly and let the login screen explain what happened.
+        try {
+          await repository.signOut();
+        } catch {}
+        setUser(null);
+        setSessionExpired(true);
+        return;
+      }
+      setDataError(message);
     }
   }, []);
 
@@ -377,6 +397,7 @@ export default function Home() {
 
   // Auth actions
   const handleLoginSuccess = (loggedInUser: AppUser) => {
+    setSessionExpired(false);
     setUser(loggedInUser);
     loadUserData(loggedInUser.id);
   };
@@ -411,6 +432,7 @@ export default function Home() {
     return (
       <AuthView
         onLoginSuccess={handleLoginSuccess}
+        notice={sessionExpired ? t.sessionExpiredNotice : null}
         C={C}
         theme={theme}
         setTheme={handleThemeChange}
@@ -455,14 +477,26 @@ export default function Home() {
               {dataError}
             </p>
           </div>
-          <button
-            onClick={() => setDataError(null)}
-            className="font-mono text-base leading-none px-2 cursor-pointer"
-            style={{ color: C.muted }}
-            aria-label="close"
-          >
-            ×
-          </button>
+          <div className="flex flex-col items-end gap-1.5 shrink-0">
+            <button
+              onClick={() => {
+                setDataError(null);
+                loadUserData(user?.id);
+              }}
+              className="font-mono text-[10px] uppercase tracking-wider px-2 py-1 cursor-pointer"
+              style={{ color: C.orange, border: `1px solid ${C.orange}` }}
+            >
+              {t.retryBtn}
+            </button>
+            <button
+              onClick={() => setDataError(null)}
+              className="font-mono text-base leading-none px-2 cursor-pointer"
+              style={{ color: C.muted }}
+              aria-label="close"
+            >
+              ×
+            </button>
+          </div>
         </div>
       )}
 

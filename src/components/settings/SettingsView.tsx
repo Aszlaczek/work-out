@@ -3,9 +3,10 @@ import { Colors, Theme } from '@/lib/theme';
 import { Translations, Lang } from '@/lib/i18n';
 import { AppUser } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
+import { Field } from '@/components/ui/Field';
 import { Toggle } from '@/components/ui/Toggle';
 import { repository } from '@/lib/repository';
-import { ShieldAlert, Database, Palette, Globe, User } from 'lucide-react';
+import { ShieldAlert, Database, Palette, Globe, User, Lock } from 'lucide-react';
 
 interface SettingsViewProps {
   user: AppUser | null;
@@ -34,7 +35,48 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [showDelete, setShowDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // Change password
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [currentPw, setCurrentPw] = useState('');
+  const [newPw, setNewPw] = useState('');
+  const [newPw2, setNewPw2] = useState('');
+  const [pwError, setPwError] = useState<string | null>(null);
+  const [pwNotice, setPwNotice] = useState<string | null>(null);
+  const [changing, setChanging] = useState(false);
+
   const isCloud = repository.isCloudConnected();
+
+  const handleChangePassword = async () => {
+    setPwError(null);
+    setPwNotice(null);
+    if (newPw !== newPw2) {
+      setPwError(t.passwordMismatch);
+      return;
+    }
+    if (newPw.length < 6) {
+      setPwError(t.shortPassword);
+      return;
+    }
+    setChanging(true);
+    try {
+      const res = await repository.changePassword(currentPw, newPw);
+      if (!res.success) {
+        if (res.code === 'wrong_current') setPwError(t.wrongCurrentPassword);
+        else if (res.code === 'too_short') setPwError(t.shortPassword);
+        else setPwError(res.error || 'Błąd zmiany hasła.');
+      } else {
+        setPwNotice(t.passwordChanged);
+        setCurrentPw('');
+        setNewPw('');
+        setNewPw2('');
+        setShowPasswordForm(false);
+      }
+    } catch (err: any) {
+      setPwError(err?.message || 'Błąd zmiany hasła.');
+    } finally {
+      setChanging(false);
+    }
+  };
 
   const handleDelete = async () => {
     if (deleteInput !== 'DELETE') return;
@@ -160,6 +202,71 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <span className="font-mono text-xs sm:text-sm font-bold truncate max-w-[200px]" style={{ color: C.text }}>
               {user?.email || 'demo@gymapp.io'}
             </span>
+          </div>
+        </Section>
+
+        {/* Security - change password */}
+        <Section title={t.security} icon={<Lock size={15} />}>
+          <div className="space-y-3">
+            {pwNotice && (
+              <div
+                className="p-2.5 font-mono text-xs"
+                style={{ background: '#34d39918', color: '#34d399', borderLeft: '2px solid #34d399' }}
+              >
+                {pwNotice}
+              </div>
+            )}
+
+            {!showPasswordForm ? (
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <span className="font-mono text-xs" style={{ color: C.muted }}>
+                  {t.accountEmail}: {user?.email || 'demo@gymapp.io'}
+                </span>
+                <Button small onClick={() => { setShowPasswordForm(true); setPwError(null); setPwNotice(null); }} C={C}>
+                  {t.changePasswordBtn}
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3 slide-up">
+                <Field label={t.currentPassword} value={currentPw} onChange={setCurrentPw} type="password" required C={C} />
+                <Field label={t.newPassword} value={newPw} onChange={setNewPw} type="password" placeholder="Min. 6 znaków" required C={C} />
+                <Field label={t.confirmPassword} value={newPw2} onChange={setNewPw2} type="password" required C={C} />
+
+                {pwError && (
+                  <div
+                    className="p-2.5 font-mono text-xs"
+                    style={{ background: C.danger + '18', color: C.danger, borderLeft: `2px solid ${C.danger}` }}
+                  >
+                    {pwError}
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <Button
+                    small
+                    disabled={changing || !currentPw || !newPw || !newPw2}
+                    onClick={handleChangePassword}
+                    C={C}
+                  >
+                    {changing ? '...' : t.changePasswordBtn}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    small
+                    onClick={() => {
+                      setShowPasswordForm(false);
+                      setCurrentPw('');
+                      setNewPw('');
+                      setNewPw2('');
+                      setPwError(null);
+                    }}
+                    C={C}
+                  >
+                    {t.deleteCancel}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </Section>
 

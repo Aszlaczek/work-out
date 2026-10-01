@@ -10,6 +10,8 @@ import { AmbientBlobs } from '@/components/layout/AmbientBlobs';
 
 interface AuthViewProps {
   onLoginSuccess: (user: AppUser) => void;
+  // Shown above the form - e.g. "your session expired, log in again"
+  notice?: string | null;
   C: Colors;
   theme: Theme;
   setTheme: (t: Theme) => void;
@@ -21,6 +23,7 @@ type AuthTab = 'login' | 'register' | 'forgot';
 
 export const AuthView: React.FC<AuthViewProps> = ({
   onLoginSuccess,
+  notice,
   C,
   theme,
   setTheme,
@@ -32,8 +35,10 @@ export const AuthView: React.FC<AuthViewProps> = ({
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(notice ?? null);
   const [resetSent, setResetSent] = useState(false);
+  // local mode only: the account exists and can be reset inside the app
+  const [resetFound, setResetFound] = useState(false);
   // e-mail of the account that is waiting for confirmation via the e-mail link
   const [pendingConfirmation, setPendingConfirmation] = useState<string | null>(null);
   const [confirmNotice, setConfirmNotice] = useState<string | null>(null);
@@ -60,6 +65,9 @@ export const AuthView: React.FC<AuthViewProps> = ({
       const res = await repository.signIn(email.trim(), password);
       if (res.error) {
         setError(res.error);
+      } else if (res.needsPasswordReset) {
+        // the reset link was already used on this device - finish it first
+        window.location.assign('/reset-password');
       } else if (res.needsConfirmation) {
         // The application waits until the user confirms the e-mail address
         setConfirmNotice(t.emailNotConfirmed);
@@ -149,6 +157,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
         setError(res.error);
       } else {
         setResetSent(true);
+        setResetFound(!!res.found);
       }
     } catch (err: any) {
       setError(err?.message || 'Błąd resetu hasła.');
@@ -444,7 +453,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
 
               {resetSent ? (
                 <div
-                  className="p-4 font-mono text-sm space-y-2"
+                  className="p-4 font-mono text-sm space-y-3"
                   style={{
                     background: C.surface,
                     borderLeft: `3px solid ${C.orange}`,
@@ -452,6 +461,17 @@ export const AuthView: React.FC<AuthViewProps> = ({
                   }}
                 >
                   <p>{t.resetSent}</p>
+                  {!isCloud && resetFound && (
+                    <Button
+                      variant="violet"
+                      small
+                      onClick={() => window.location.assign('/reset-password')}
+                      C={C}
+                      fullWidth
+                    >
+                      {t.demoResetLink}
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <>

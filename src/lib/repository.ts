@@ -1,4 +1,10 @@
-import { getSupabaseClient, isSupabaseConfigured } from './supabase/client';
+import {
+  getSupabaseClient,
+  isSupabaseConfigured,
+  markPendingPasswordReset,
+  clearPendingPasswordReset,
+  readPendingPasswordReset,
+} from './supabase/client';
 import { Exercise, Routine, Workout, AppUser, WorkoutExercise, SetLog, ExerciseCategory } from './types';
 import { EXERCISES as SEED_EXERCISES, SEED_ROUTINES, SEED_WORKOUTS } from './seedData';
 
@@ -45,6 +51,15 @@ export type AuthResult = {
   error: string | null;
   // true = account exists but the e-mail address was not confirmed yet
   needsConfirmation?: boolean;
+  // true = a password reset was started and a new password must be set first
+  needsPasswordReset?: boolean;
+};
+
+// Password change / reset. `code` lets the UI show a translated message.
+export type PasswordResult = {
+  success: boolean;
+  error: string | null;
+  code?: 'wrong_current' | 'too_short' | 'invalid';
 };
 
 type LocalAccount = { email: string; password: string; confirmed?: boolean };
@@ -57,6 +72,11 @@ const DEMO_ACCOUNT: LocalAccount = {
 
 function getEmailRedirectTo(): string | undefined {
   return typeof window !== 'undefined' ? window.location.origin : undefined;
+}
+
+// The e-mail link always opens the forced "set a new password" screen
+function getResetPasswordUrl(): string | undefined {
+  return typeof window !== 'undefined' ? window.location.origin + '/reset-password' : undefined;
 }
 
 function getLocalAccounts(): LocalAccount[] {
@@ -79,11 +99,46 @@ const hiddenRoutinesKey = (userId?: string) => localKey('gp_hidden_routines', us
 
 // A write that failed must never look successful - the row would simply come
 // back after the next reload. Every Supabase error is therefore surfaced.
-function assertNoError(action: string, error: { message?: string } | null | undefined): void {
+// A broken/expired Supabase session is the most common reason a request fails,
+// and it has to be told apart from an ordinary database error so the UI can
+// send the user back to the login screen instead of showing stale data.
+function isSessionError(error: any): boolean {
+  const status = error?.status ?? error?.code;
+  const text = [error?.message, error?.error_description, error?.code]
+    .filter(Boolean)
+    .join(' ');
+  return String(status) === '401' || /jwt|refresh[_ ]?token|token expired|not authenticated/i.test(text);
+}
+
+function taggedError(action: string, message: string, sessionExpired: boolean): Error {
+  const e = new Error(`${action}: ${message}`);
+  (e as any).sessionExpired = sessionExpired;
+  return e;
+}
+
+function assertNoError(
+  action: string,
+  error: { message?: string; status?: number; code?: string } | null | undefined,
+): void {
   if (!error) return;
   const message = error.message || String(error);
   console.error(`[repository] ${action} failed:`, message);
-  throw new Error(message);
+  throw taggedError(action, message, isSessionError(error));
+}
+
+// Reads must never fall back to local storage while Supabase is connected:
+// that would show old local plans as if they were live data, and every later
+// write would reach the database with ids that do not exist there.
+function assertReadOk<T>(
+  action: string,
+  res: { data?: T | null; error?: { message?: string; status?: number; code?: string } | null },
+): T {
+  if (res.error) {
+    const message = res.error.message || String(res.error);
+    console.error(`[repository] ${action} failed:`, message);
+    throw taggedError(action, message, isSessionError(res.error));
+  }
+  return (res.data ?? []) as T;
 }
 
 function mapSupabaseRoutine(r: any): Routine {
@@ -181,6 +236,10 @@ export const repository = {
   async signIn(email: string, pass: string): Promise<AuthResult> {
     const client = getSupabaseClient();
     if (client) {
+      // A reset link was used on this device - no login before a new password
+      if (readPendingPasswordReset()) {
+        return { user: null, error: null, needsPasswordReset: true };
+      }
       const { data, error } = await client.auth.signInWithPassword({ email, password: pass });
       if (error) {
         if (/not confirmed|confirmation/i.test(error.message || '')) {
@@ -205,6 +264,11 @@ export const repository = {
     if (!acc) {
       if (!isDemoFallback) return { user: null, error: 'Nieprawidłowy e-mail lub hasło.' };
     } else {
+      // A reset was started for this account - a new password comes first
+      const pendingReset = readPendingPasswordReset();
+      if (pendingReset && pendingReset.toLowerCase() === acc.email.toLowerCase()) {
+        return { user: null, error: null, needsPasswordReset: true };
+      }
       if (acc.password !== pass) return { user: null, error: 'Nieprawidłowy e-mail lub hasło.' };
       if (acc.confirmed === false) {
         return { user: null, error: null, needsConfirmation: true };
@@ -284,13 +348,97 @@ export const repository = {
     }
   },
 
-  async resetPassword(email: string): Promise<{ success: boolean; error: string | null }> {
+  async resetPassword(email: string): Promise<{ success: boolean; error: string | null; found?: boolean }> {
     const client = getSupabaseClient();
     if (client) {
-      const { error } = await client.auth.resetPasswordForEmail(email);
+      const { error } = await client.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: getResetPasswordUrl(),
+      });
       if (error) return { success: false, error: error.message };
       return { success: true, error: null };
     }
+    // Local mode has no mailbox: the account is locked until a new password
+    // is set through the demo link shown in the application
+    const clean = email.trim().toLowerCase();
+    const acc = getLocalAccounts().find((a) => a.email.toLowerCase() === clean);
+    if (acc) markPendingPasswordReset(acc.email);
+    return { success: true, error: null, found: !!acc };
+  },
+
+  // A password reset was started on this device (e-mail link clicked, or the
+  // demo link in local mode) - the application must stay closed until it is done
+  hasPendingPasswordReset(): boolean {
+    if (typeof window === 'undefined') return false;
+    if (/[?&#]type=recovery\b/.test(window.location.href)) {
+      markPendingPasswordReset();
+      return true;
+    }
+    return readPendingPasswordReset() !== null;
+  },
+
+  // Called from the forced /reset-password screen
+  async setNewPassword(newPassword: string): Promise<PasswordResult> {
+    if (newPassword.length < 6) return { success: false, error: 'short', code: 'too_short' };
+
+    const client = getSupabaseClient();
+    if (client) {
+      const { error } = await client.auth.updateUser({ password: newPassword });
+      if (error) {
+        // expired link / lost session - the old password keeps working again
+        if (/session|jwt|not found/i.test(error.message || '')) clearPendingPasswordReset();
+        return { success: false, error: error.message, code: 'invalid' };
+      }
+      clearPendingPasswordReset();
+      // the reset link must not grant access - the user signs in again
+      await client.auth.signOut();
+      return { success: true, error: null };
+    }
+
+    const pending = readPendingPasswordReset();
+    if (!pending || pending === '1') {
+      return { success: false, error: 'Link resetujący wygasł.', code: 'invalid' };
+    }
+    const accounts = getLocalAccounts();
+    const idx = accounts.findIndex((a) => a.email.toLowerCase() === pending.toLowerCase());
+    if (idx < 0) {
+      clearPendingPasswordReset();
+      return { success: false, error: 'Konto nie istnieje.', code: 'invalid' };
+    }
+    accounts[idx] = { ...accounts[idx], password: newPassword };
+    setLocal(LOCAL_STORAGE_KEYS.ACCOUNTS, accounts);
+    clearPendingPasswordReset();
+    return { success: true, error: null };
+  },
+
+  // Change password of the signed in account (Settings)
+  async changePassword(currentPassword: string, newPassword: string): Promise<PasswordResult> {
+    if (newPassword.length < 6) return { success: false, error: 'short', code: 'too_short' };
+
+    const client = getSupabaseClient();
+    if (client) {
+      const { data: userData, error: userErr } = await client.auth.getUser();
+      const email = userData.user?.email;
+      if (userErr || !email) {
+        return { success: false, error: 'Sesja wygasła. Zaloguj się ponownie.', code: 'invalid' };
+      }
+      // the current password has to be proven before the new one is stored
+      const { error: verifyErr } = await client.auth.signInWithPassword({ email, password: currentPassword });
+      if (verifyErr) return { success: false, error: verifyErr.message, code: 'wrong_current' };
+
+      const { error } = await client.auth.updateUser({ password: newPassword });
+      if (error) return { success: false, error: error.message, code: 'invalid' };
+      return { success: true, error: null };
+    }
+
+    const localUser = getLocal<AppUser | null>(LOCAL_STORAGE_KEYS.USER, null);
+    const accounts = getLocalAccounts();
+    const idx = accounts.findIndex((a) => a.email.toLowerCase() === (localUser?.email || '').toLowerCase());
+    if (idx < 0) return { success: false, error: 'Konto nie istnieje.', code: 'invalid' };
+    if (accounts[idx].password !== currentPassword) {
+      return { success: false, error: 'Nieprawidłowe obecne hasło.', code: 'wrong_current' };
+    }
+    accounts[idx] = { ...accounts[idx], password: newPassword };
+    setLocal(LOCAL_STORAGE_KEYS.ACCOUNTS, accounts);
     return { success: true, error: null };
   },
 
@@ -332,7 +480,15 @@ export const repository = {
         client.from('user_exercise_notes').select('exercise_id, notes').eq('user_id', userId ?? ''),
       ]);
 
-      if (!exRes.error && exRes.data && exRes.data.length > 0) {
+      const exRows = assertReadOk('load exercises', exRes);
+      if (ovRes.error) {
+        console.error('[repository] reading exercise overrides failed:', ovRes.error.message);
+      }
+      if (notesRes.error) {
+        console.error('[repository] reading exercise notes failed:', notesRes.error.message);
+      }
+
+      if (exRows.length > 0) {
         const ovMap = new Map<string, any>();
         (ovRes.data || []).forEach((o: any) => ovMap.set(o.exercise_id, o));
 
@@ -342,7 +498,7 @@ export const repository = {
         });
 
         const merged: Exercise[] = [];
-        exRes.data.forEach((e: any) => {
+        exRows.forEach((e: any) => {
           const ov = ovMap.get(e.id);
           if (ov?.hidden) return;
           merged.push({
@@ -358,6 +514,9 @@ export const repository = {
         });
         return merged;
       }
+
+      // Cloud mode: the library is whatever the database holds, never local seeds
+      return [];
     }
 
     // Local fallback: Predefined immutable exercises + user-specific custom exercises + user notes
@@ -388,19 +547,22 @@ export const repository = {
   async getHiddenExercises(userId?: string): Promise<Exercise[]> {
     const client = getSupabaseClient();
     if (client && userId) {
-      const { data: hidden } = await client
-        .from('user_exercise_overrides')
-        .select('exercise_id')
-        .eq('hidden', true);
+      const hidden = assertReadOk(
+        'load hidden exercises',
+        await client.from('user_exercise_overrides').select('exercise_id').eq('hidden', true),
+      );
       const ids = (hidden || []).map((h: any) => h.exercise_id);
       if (ids.length === 0) return [];
 
-      const { data } = await client
-        .from('exercises')
-        .select('id, name, category, muscle, description, user_id')
-        .in('id', ids)
-        .order('name');
-      return (data || []).map((e: any) => ({
+      const rows = assertReadOk(
+        'load hidden exercises',
+        await client
+          .from('exercises')
+          .select('id, name, category, muscle, description, user_id')
+          .in('id', ids)
+          .order('name'),
+      );
+      return rows.map((e: any) => ({
         id: e.id,
         name: e.name,
         category: e.category as ExerciseCategory,
@@ -409,6 +571,8 @@ export const repository = {
         isCustom: !!e.user_id,
       }));
     }
+
+    if (client) return [];
 
     const overrides = getLocal<Record<string, ExerciseOverride>>(exerciseOverridesKey(userId), {});
     const hiddenIds = Object.keys(overrides).filter((id) => overrides[id].hidden);
@@ -585,20 +749,20 @@ export const repository = {
         client.from('user_routine_hides').select('routine_id'),
       ]);
 
-      if (routinesRes.error) {
-        console.error('[repository] reading plans failed:', routinesRes.error.message);
-      }
       if (hidesRes.error) {
         console.error('[repository] reading hidden plans failed:', hidesRes.error.message);
       }
 
-      if (!routinesRes.error && routinesRes.data) {
-        const hidden = new Set((hidesRes.data || []).map((h: any) => h.routine_id));
-        return routinesRes.data
-          .filter((r: any) => !hidden.has(r.id))
-          .map((r: any) => mapSupabaseRoutine(r));
-      }
+      const routineRows = assertReadOk('load plans', routinesRes);
+      const hidden = new Set((hidesRes.data || []).map((h: any) => h.routine_id));
+      return routineRows
+        .filter((r: any) => !hidden.has(r.id))
+        .map((r: any) => mapSupabaseRoutine(r));
     }
+
+    // Supabase is connected but nobody is signed in yet: an empty list is the
+    // only honest answer - local plans must not leak into the cloud mode.
+    if (client) return [];
 
     // Local fallback: shared predefined plans + private plans of this user
     const ownRoutines = migrateLegacyLocalRoutines(userId);
@@ -614,27 +778,35 @@ export const repository = {
   async getHiddenRoutines(userId?: string): Promise<Routine[]> {
     const client = getSupabaseClient();
     if (client && userId) {
-      const { data: hides } = await client.from('user_routine_hides').select('routine_id');
+      const hides = assertReadOk(
+        'load hidden plans',
+        await client.from('user_routine_hides').select('routine_id'),
+      );
       const ids = (hides || []).map((h: any) => h.routine_id);
       if (ids.length === 0) return [];
 
-      const { data } = await client
-        .from('routines')
-        .select(`
-          id,
-          name,
-          user_id,
-          routine_exercises (
-            exercise_id,
-            target_sets,
-            target_reps,
-            sort_order
-          )
-        `)
-        .in('id', ids)
-        .order('created_at', { ascending: true });
-      return (data || []).map((r: any) => mapSupabaseRoutine(r));
+      const rows = assertReadOk(
+        'load hidden plans',
+        await client
+          .from('routines')
+          .select(`
+            id,
+            name,
+            user_id,
+            routine_exercises (
+              exercise_id,
+              target_sets,
+              target_reps,
+              sort_order
+            )
+          `)
+          .in('id', ids)
+          .order('created_at', { ascending: true }),
+      );
+      return rows.map((r: any) => mapSupabaseRoutine(r));
     }
+
+    if (client) return [];
 
     const hiddenIds = getLocal<string[]>(hiddenRoutinesKey(userId), []);
     return SEED_ROUTINES.filter((r) => hiddenIds.includes(r.id)).map((r) => ({
@@ -755,7 +927,11 @@ export const repository = {
   // Predefined plan = hide it for this user only, other users keep it.
   async deleteRoutine(routineId: string, userId?: string, isPredefined?: boolean): Promise<void> {
     const client = getSupabaseClient();
-    if (client && userId) {
+    // Only uuid ids can exist in Supabase. Anything else was created in local
+    // storage and has to be removed there - Postgres would reject the request
+    // with "invalid input syntax for type uuid".
+    const inCloud = !!client && !!userId && isUuid(routineId);
+    if (inCloud) {
       if (isPredefined) {
         const { error } = await client.from('user_routine_hides').upsert({ user_id: userId, routine_id: routineId });
         assertNoError('hide predefined plan', error);
@@ -769,7 +945,7 @@ export const repository = {
         .select('id');
       assertNoError('delete plan', error);
       if (!data || data.length === 0) {
-        throw new Error('Plan was not deleted');
+        throw new Error('delete plan: the plan does not exist any more');
       }
       return;
     }
@@ -840,31 +1016,30 @@ export const repository = {
         `)
         .order('date', { ascending: false });
 
-      if (!error && data) {
-        return data.map((w: any) => ({
-          id: w.id,
-          routineId: w.routine_id,
-          routineName: w.routine_name,
-          date: w.date,
-          duration: w.duration || 0,
-          notes: w.notes,
-          status: w.status || 'completed',
-          exercises: (w.workout_exercises || [])
-            .sort((a: any, b: any) => a.sort_order - b.sort_order)
-            .map((we: any) => ({
-              exerciseId: we.exercise_id,
-              sets: (we.workout_sets || [])
-                .sort((a: any, b: any) => a.set_number - b.set_number)
-                .map((s: any) => ({
-                  id: s.id,
-                  weight: Number(s.weight),
-                  reps: Number(s.reps),
-                  rpe: s.rpe ? Number(s.rpe) : null,
-                  done: s.done ?? true,
-                })),
-            })),
-        }));
-      }
+      const rows = assertReadOk('load workouts', { data, error });
+      return rows.map((w: any) => ({
+        id: w.id,
+        routineId: w.routine_id,
+        routineName: w.routine_name,
+        date: w.date,
+        duration: w.duration || 0,
+        notes: w.notes,
+        status: w.status || 'completed',
+        exercises: (w.workout_exercises || [])
+          .sort((a: any, b: any) => a.sort_order - b.sort_order)
+          .map((we: any) => ({
+            exerciseId: we.exercise_id,
+            sets: (we.workout_sets || [])
+              .sort((a: any, b: any) => a.set_number - b.set_number)
+              .map((s: any) => ({
+                id: s.id,
+                weight: Number(s.weight),
+                reps: Number(s.reps),
+                rpe: s.rpe ? Number(s.rpe) : null,
+                done: s.done ?? true,
+              })),
+          })),
+      }));
     }
 
     // Workouts for every user start 100% clean and empty by default

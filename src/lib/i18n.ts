@@ -94,6 +94,8 @@ export const T = {
     // save/delete errors (nothing was changed when this shows up)
     syncErrorTitle: "Nie udało się zapisać zmiany",
     syncErrorHint: "Nic nie zostało usunięte ani zmienione — spróbuj ponownie.",
+    retryBtn: "SPRÓBUJ PONOWNIE",
+    sessionExpiredNotice: "Sesja wygasła. Zaloguj się ponownie, aby kontynuować.",
 
     // exercises
     exercisesTitle: "BAZA ĆWICZEŃ",
@@ -175,6 +177,22 @@ export const T = {
     deleteCancel: "ANULUJ",
     accountDeleted: "Konto zostało usunięte.",
     resetLocalData: "ZRESETUJ DANE LOKALNE",
+
+    // password security
+    security: "BEZPIECZEŃSTWO",
+    currentPassword: "OBECNE HASŁO",
+    newPassword: "NOWE HASŁO",
+    changePasswordBtn: "ZMIEŃ HASŁO",
+    passwordChanged: "Hasło zostało zmienione.",
+    wrongCurrentPassword: "Nieprawidłowe obecne hasło.",
+    resetPasswordTitle: "Ustaw nowe hasło",
+    resetPasswordIntro:
+      "Aby wrócić do aplikacji, musisz najpierw ustawić nowe hasło.",
+    resetPasswordBtn: "ZAPISZ NOWE HASŁO",
+    passwordResetTitle: "Hasło zmienione",
+    passwordResetDone: "Hasło zmienione. Zaloguj się ponownie, aby wejść do aplikacji.",
+    resetLinkInvalid: "Link resetujący jest nieprawidłowy lub wygasł.",
+    demoResetLink: "OTWÓRZ LINK RESETUJĄCY (DEMO)",
   },
 
   en: {
@@ -263,6 +281,8 @@ export const T = {
 
     syncErrorTitle: "The change was not saved",
     syncErrorHint: "Nothing was removed or changed — please try again.",
+    retryBtn: "RETRY",
+    sessionExpiredNotice: "Your session expired. Please log in again to continue.",
 
     exercisesTitle: "EXERCISE DATABASE",
     newExercise: "NEW EXERCISE",
@@ -337,6 +357,21 @@ export const T = {
     deleteCancel: "CANCEL",
     accountDeleted: "Account deleted.",
     resetLocalData: "RESET LOCAL DATA",
+
+    security: "SECURITY",
+    currentPassword: "CURRENT PASSWORD",
+    newPassword: "NEW PASSWORD",
+    changePasswordBtn: "CHANGE PASSWORD",
+    passwordChanged: "Password has been changed.",
+    wrongCurrentPassword: "Current password is incorrect.",
+    resetPasswordTitle: "Set a new password",
+    resetPasswordIntro:
+      "You have to set a new password before you can enter the application.",
+    resetPasswordBtn: "SAVE NEW PASSWORD",
+    passwordResetTitle: "Password changed",
+    passwordResetDone: "Password changed. Sign in again to enter the application.",
+    resetLinkInvalid: "The reset link is invalid or has expired.",
+    demoResetLink: "OPEN RESET LINK (DEMO)",
   },
 } as const;
 

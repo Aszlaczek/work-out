@@ -79,6 +79,8 @@ Aplikacja w 100% odzwierciedla design z prototypu `base` (ciemny/jasny motyw, dy
 - **Wielojęzyczność**: Pełne wsparcie dla języka **polskiego (PL)** i **angielskiego (EN)**.
 - **Autentykacja**: Rejestracja, Logowanie, Reset hasła, Usuwanie konta.
 - **Obowiązkowe potwierdzenie e-maila**: Po rejestracji aplikacja **czeka na kliknięcie linku** wysłanego na adres e-mail. Dopiero potwierdzone konto może się zalogować — do tego czasu ekran logowania pokazuje prośbę o otwarcie linku (z opcją wysłania go ponownie). W trybie lokalnym (bez Supabase) link potwierdzający jest symulowany przyciskiem `OTWÓRZ LINK POTWIERDZAJĄCY (DEMO)`.
+- **Zmiana hasła (Ustawieniach → `BEZPIECZEŃSTWO`)**: formularz prosi o obecne hasło, nowe hasło i jego potwierdzenie. Obecne hasło jest weryfikowane przed zapisem, więc samo posiadanie sesji nie wystarczy.
+- **Reset hasła („Zapomniałem hasła")**: link z e-maila otwiera podstronę `/reset-password` i **blokuje wejście do aplikacji** — dopóki nowe hasło nie zostanie ustawione, użytkownik nie może się zalogować (także starym hasłem). Po zapisaniu nowego hasła sesja z linku resetującego jest wylogowywana i trzeba zalogować się ponownie. W trybie lokalnym link jest symulowany przyciskiem `OTWÓRZ LINK RESETUJĄCY (DEMO)`.
 
 ---
 
