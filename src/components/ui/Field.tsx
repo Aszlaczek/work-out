@@ -15,7 +15,7 @@ interface FieldProps {
   className?: string;
 }
 
-export const Field: React.FC<FieldProps> = ({
+export const Field = React.memo<FieldProps>(({
   label,
   value,
   onChange,
@@ -56,7 +56,7 @@ export const Field: React.FC<FieldProps> = ({
       />
     </div>
   );
-};
+});
 
 export const SectionTitle: React.FC<{ children: React.ReactNode; C: Colors; className?: string }> = ({
   children,
