@@ -71,7 +71,7 @@ const DEMO_ACCOUNT: LocalAccount = {
 };
 
 function getEmailRedirectTo(): string | undefined {
-  return typeof window !== 'undefined' ? window.location.origin : undefined;
+  return typeof window !== "undefined" ? window.location.origin + "/auth/callback" : undefined;
 }
 
 // The e-mail link always opens the forced "set a new password" screen
