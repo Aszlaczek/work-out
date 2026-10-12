@@ -40,7 +40,7 @@ Wymagane Node.js 22 LTS i npm. Polecenia wykonuj w katalogu projektu:
 
 ```bash
 npm ci
-cp .env.local.example .env.local
+cp .env.local
 npm run dev
 ```
 
