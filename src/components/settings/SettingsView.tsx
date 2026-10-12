@@ -20,6 +20,33 @@ interface SettingsViewProps {
   t: Translations;
 }
 
+const Section = ({
+  title,
+  icon,
+  children,
+  C,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+  C: Colors;
+}) => (
+  <div
+    className="p-5 sm:p-6 mb-4"
+    style={{
+      background: C.card,
+      border: `1px solid ${C.border}`,
+      borderLeft: `3px solid ${C.border}`,
+    }}
+  >
+    <div className="flex items-center gap-2 font-display font-bold text-xs tracking-widest uppercase mb-4" style={{ color: C.muted }}>
+      {icon}
+      <span>{title}</span>
+    </div>
+    {children}
+  </div>
+);
+
 export const SettingsView: React.FC<SettingsViewProps> = ({
   user,
   theme,
@@ -34,6 +61,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [deleteInput, setDeleteInput] = useState('');
   const [showDelete, setShowDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Change password
   const [showPasswordForm, setShowPasswordForm] = useState(false);
@@ -47,6 +75,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const isCloud = repository.isCloudConnected();
 
   const handleChangePassword = async () => {
+    if (changing || deleting) return;
     setPwError(null);
     setPwNotice(null);
     if (newPw !== newPw2) {
@@ -79,39 +108,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   const handleDelete = async () => {
-    if (deleteInput !== 'DELETE') return;
+    if (deleteInput !== 'DELETE' || deleting || changing) return;
+    setDeleteError(null);
     setDeleting(true);
     try {
       await onDeleteAccount();
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : (lang === 'pl' ? 'Nie udało się usunąć konta.' : 'Could not delete account.'));
     } finally {
       setDeleting(false);
     }
   };
-
-  const Section = ({
-    title,
-    icon,
-    children,
-  }: {
-    title: string;
-    icon: React.ReactNode;
-    children: React.ReactNode;
-  }) => (
-    <div
-      className="p-5 sm:p-6 mb-4"
-      style={{
-        background: C.card,
-        border: `1px solid ${C.border}`,
-        borderLeft: `3px solid ${C.border}`,
-      }}
-    >
-      <div className="flex items-center gap-2 font-display font-bold text-xs tracking-widest uppercase mb-4" style={{ color: C.muted }}>
-        {icon}
-        <span>{title}</span>
-      </div>
-      {children}
-    </div>
-  );
 
   return (
     <div className="h-full overflow-y-auto pb-24 md:pb-12">
@@ -127,7 +134,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
 
         {/* Appearance */}
-        <Section title={t.appearance} icon={<Palette size={15} />}>
+        <Section C={C} title={t.appearance} icon={<Palette size={15} />}>
           <div className="flex items-center justify-between gap-4">
             <span className="font-display font-bold text-sm tracking-wide" style={{ color: C.text }}>
               {t.theme}
@@ -145,7 +152,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </Section>
 
         {/* Language */}
-        <Section title={t.language} icon={<Globe size={15} />}>
+        <Section C={C} title={t.language} icon={<Globe size={15} />}>
           <div className="flex items-center justify-between gap-4">
             <span className="font-display font-bold text-sm tracking-wide" style={{ color: C.text }}>
               {t.language}
@@ -163,7 +170,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </Section>
 
         {/* Database Status */}
-        <Section title={t.database} icon={<Database size={15} />}>
+        <Section C={C} title={t.database} icon={<Database size={15} />}>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="font-mono text-xs font-bold" style={{ color: C.text }}>
@@ -194,7 +201,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </Section>
 
         {/* Account Info */}
-        <Section title={t.account} icon={<User size={15} />}>
+        <Section C={C} title={t.account} icon={<User size={15} />}>
           <div className="flex items-center justify-between">
             <span className="font-display font-bold text-xs tracking-widest" style={{ color: C.muted }}>
               {t.accountEmail}
@@ -206,10 +213,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </Section>
 
         {/* Security - change password */}
-        <Section title={t.security} icon={<Lock size={15} />}>
+        <Section C={C} title={t.security} icon={<Lock size={15} />}>
           <div className="space-y-3">
             {pwNotice && (
               <div
+                role="status"
                 className="p-2.5 font-mono text-xs"
                 style={{ background: '#34d39918', color: '#34d399', borderLeft: '2px solid #34d399' }}
               >
@@ -227,13 +235,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </Button>
               </div>
             ) : (
-              <div className="space-y-3 slide-up">
-                <Field label={t.currentPassword} value={currentPw} onChange={setCurrentPw} type="password" required C={C} />
-                <Field label={t.newPassword} value={newPw} onChange={setNewPw} type="password" placeholder="Min. 6 znaków" required C={C} />
-                <Field label={t.confirmPassword} value={newPw2} onChange={setNewPw2} type="password" required C={C} />
+              <form className="space-y-3 slide-up" onSubmit={(event) => { event.preventDefault(); void handleChangePassword(); }}>
+                <Field label={t.currentPassword} value={currentPw} onChange={setCurrentPw} type="password" autoComplete="current-password" disabled={changing || deleting} required C={C} />
+                <Field label={t.newPassword} value={newPw} onChange={setNewPw} type="password" autoComplete="new-password" disabled={changing || deleting} placeholder="Min. 6 znaków" required C={C} />
+                <Field label={t.confirmPassword} value={newPw2} onChange={setNewPw2} type="password" autoComplete="new-password" disabled={changing || deleting} required C={C} />
 
                 {pwError && (
                   <div
+                    role="alert"
                     className="p-2.5 font-mono text-xs"
                     style={{ background: C.danger + '18', color: C.danger, borderLeft: `2px solid ${C.danger}` }}
                   >
@@ -244,8 +253,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <div className="flex gap-2">
                   <Button
                     small
-                    disabled={changing || !currentPw || !newPw || !newPw2}
-                    onClick={handleChangePassword}
+                    disabled={changing || deleting || !currentPw || !newPw || !newPw2}
+                    type="submit"
                     C={C}
                   >
                     {changing ? '...' : t.changePasswordBtn}
@@ -265,7 +274,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     {t.deleteCancel}
                   </Button>
                 </div>
-              </div>
+              </form>
             )}
           </div>
         </Section>
@@ -309,7 +318,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <p className="font-mono text-xs" style={{ color: C.muted }}>
                 {t.deleteConfirmText}
               </p>
+              {deleteError && <p role="alert" className="font-mono text-xs" style={{ color: C.danger }}>{deleteError}</p>}
               <input
+                aria-label={t.deleteConfirmText}
+                disabled={deleting}
                 value={deleteInput}
                 onChange={(e) => setDeleteInput(e.target.value)}
                 placeholder="DELETE"
@@ -324,7 +336,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <Button
                   variant="danger"
                   small
-                  disabled={deleteInput !== 'DELETE' || deleting}
+                  disabled={deleteInput !== 'DELETE' || deleting || changing}
                   onClick={handleDelete}
                   C={C}
                 >

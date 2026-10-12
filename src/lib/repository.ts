@@ -62,9 +62,10 @@ export type PasswordResult = {
   code?: 'wrong_current' | 'too_short' | 'invalid';
 };
 
-type LocalAccount = { email: string; password: string; confirmed?: boolean };
+type LocalAccount = { id?: string; email: string; password: string; confirmed?: boolean };
 
 const DEMO_ACCOUNT: LocalAccount = {
+  id: 'demo-user-id',
   email: 'demo@gymapp.io',
   password: 'demo1234',
   confirmed: true,
@@ -80,8 +81,15 @@ function getResetPasswordUrl(): string | undefined {
 }
 
 function getLocalAccounts(): LocalAccount[] {
-  const stored = getLocal<LocalAccount[]>(LOCAL_STORAGE_KEYS.ACCOUNTS, []);
-  return stored.length > 0 ? stored : [DEMO_ACCOUNT];
+  const stored = getLocal<LocalAccount[] | null>(LOCAL_STORAGE_KEYS.ACCOUNTS, null);
+  const legacyUser = getLocal<AppUser | null>(LOCAL_STORAGE_KEYS.USER, null);
+  const accounts = (stored ?? [DEMO_ACCOUNT]).map((account) => ({
+    ...account,
+    id: account.id ?? (account.email.toLowerCase() === legacyUser?.email.toLowerCase()
+      ? legacyUser.id : mkId()),
+  }));
+  if (!stored || stored.some((account) => !account.id)) setLocal(LOCAL_STORAGE_KEYS.ACCOUNTS, accounts);
+  return accounts;
 }
 
 // Per user modification of a predefined exercise (null/undefined field = keep original value)
@@ -206,7 +214,7 @@ function setLocal<T>(key: string, val: T): void {
   try {
     localStorage.setItem(key, JSON.stringify(val));
   } catch (e) {
-    console.error('LocalStorage write error:', e);
+    throw new Error('Nie można zapisać danych w przeglądarce. Sprawdź dostępne miejsce i ustawienia pamięci.');
   }
 }
 
@@ -230,7 +238,12 @@ export const repository = {
       }
       return null;
     }
-    return getLocal<AppUser | null>(LOCAL_STORAGE_KEYS.USER, null);
+    const saved = getLocal<AppUser | null>(LOCAL_STORAGE_KEYS.USER, null);
+    const account = getLocalAccounts().find((a) => a.email.toLowerCase() === saved?.email.toLowerCase());
+    if (!account || account.confirmed === false) return null;
+    const user = { id: account.id!, email: account.email };
+    setLocal(LOCAL_STORAGE_KEYS.USER, user);
+    return user;
   },
 
   async signIn(email: string, pass: string): Promise<AuthResult> {
@@ -259,23 +272,13 @@ export const repository = {
     const accounts = getLocalAccounts();
     const emailLc = email.trim().toLowerCase();
     const acc = accounts.find((a) => a.email.toLowerCase() === emailLc);
-    const isDemoFallback = emailLc === DEMO_ACCOUNT.email && pass === DEMO_ACCOUNT.password;
-
-    if (!acc) {
-      if (!isDemoFallback) return { user: null, error: 'Nieprawidłowy e-mail lub hasło.' };
-    } else {
-      // A reset was started for this account - a new password comes first
-      const pendingReset = readPendingPasswordReset();
-      if (pendingReset && pendingReset.toLowerCase() === acc.email.toLowerCase()) {
-        return { user: null, error: null, needsPasswordReset: true };
-      }
-      if (acc.password !== pass) return { user: null, error: 'Nieprawidłowy e-mail lub hasło.' };
-      if (acc.confirmed === false) {
-        return { user: null, error: null, needsConfirmation: true };
-      }
+    if (!acc || acc.password !== pass) return { user: null, error: 'Nieprawidłowy e-mail lub hasło.' };
+    const pendingReset = readPendingPasswordReset();
+    if (pendingReset?.toLowerCase() === acc.email.toLowerCase()) {
+      return { user: null, error: null, needsPasswordReset: true };
     }
-
-    const user: AppUser = { id: 'demo-user-id', email };
+    if (acc.confirmed === false) return { user: null, error: null, needsConfirmation: true };
+    const user: AppUser = { id: acc.id!, email: acc.email };
     setLocal(LOCAL_STORAGE_KEYS.USER, user);
     return { user, error: null };
   },
@@ -307,7 +310,7 @@ export const repository = {
     if (accounts.some((a) => a.email.toLowerCase() === cleanEmail.toLowerCase())) {
       return { user: null, error: 'Konto z tym adresem już istnieje.' };
     }
-    accounts.push({ email: cleanEmail, password: pass, confirmed: false });
+    accounts.push({ id: mkId(), email: cleanEmail, password: pass, confirmed: false });
     setLocal(LOCAL_STORAGE_KEYS.ACCOUNTS, accounts);
 
     return { user: null, error: null, needsConfirmation: true };
@@ -385,8 +388,9 @@ export const repository = {
       const { error } = await client.auth.updateUser({ password: newPassword });
       if (error) {
         // expired link / lost session - the old password keeps working again
-        if (/session|jwt|not found/i.test(error.message || '')) clearPendingPasswordReset();
-        return { success: false, error: error.message, code: 'invalid' };
+        const invalid = /session|jwt|not found/i.test(error.message || '');
+        if (invalid) clearPendingPasswordReset();
+        return { success: false, error: error.message, ...(invalid ? { code: 'invalid' as const } : {}) };
       }
       clearPendingPasswordReset();
       // the reset link must not grant access - the user signs in again
@@ -444,25 +448,33 @@ export const repository = {
 
   async deleteAccount(): Promise<void> {
     const client = getSupabaseClient();
+    let userId: string;
     if (client) {
-      // In Supabase client, user cannot delete own auth account directly without RPC or service role,
-      // but can wipe profile data and sign out.
-      const { data } = await client.auth.getUser();
-      if (data.user) {
-        await client.from('workouts').delete().eq('user_id', data.user.id);
-        await client.from('routines').delete().eq('user_id', data.user.id);
-        await client.from('exercises').delete().eq('user_id', data.user.id);
-        await client.from('user_routine_hides').delete().eq('user_id', data.user.id);
-        await client.from('user_exercise_overrides').delete().eq('user_id', data.user.id);
-        await client.from('user_exercise_notes').delete().eq('user_id', data.user.id);
+      const { data, error } = await client.auth.getSession();
+      if (error || !data.session) throw new Error('Sesja wygasła. Zaloguj się ponownie.');
+      userId = data.session.user.id;
+      const response = await fetch('/api/account', {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${data.session.access_token}` },
+      });
+      if (!response.ok) {
+        const result = await response.json().catch(() => null);
+        throw new Error(result?.error || 'Nie udało się usunąć konta. Spróbuj ponownie.');
       }
-      await client.auth.signOut();
+      // Auth user and dependent rows are already deleted; clear this browser's session.
+      await client.auth.signOut({ scope: 'local' });
+    } else {
+      const user = await this.getInitialUser();
+      if (!user) throw new Error('Sesja wygasła. Zaloguj się ponownie.');
+      userId = user.id;
+      setLocal(LOCAL_STORAGE_KEYS.ACCOUNTS, getLocalAccounts().filter((a) => a.id !== userId));
     }
     if (typeof window !== 'undefined') {
+      for (const base of ['gp_workouts', 'gp_routines', 'gp_custom_exercises', 'gp_exercise_notes', 'gp_exercise_overrides', 'gp_hidden_routines', 'gp_active_workout']) {
+        localStorage.removeItem(`${base}_${userId}`);
+      }
       localStorage.removeItem(LOCAL_STORAGE_KEYS.USER);
-      localStorage.removeItem(LOCAL_STORAGE_KEYS.WORKOUTS);
-      localStorage.removeItem(LOCAL_STORAGE_KEYS.ROUTINES);
-      localStorage.removeItem(LOCAL_STORAGE_KEYS.ACTIVE_WORKOUT);
+      clearPendingPasswordReset();
     }
   },
 

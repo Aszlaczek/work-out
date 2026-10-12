@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useEntranceAnimation } from '@/lib/hooks/useEntranceAnimation';
 import { Colors } from '@/lib/theme';
 
 interface ModalProps {
@@ -15,6 +16,7 @@ export const Modal: React.FC<ModalProps> = ({
   C,
   maxWidth = 'max-w-md',
 }) => {
+  const panelRef = useEntranceAnimation(true);
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -36,7 +38,8 @@ export const Modal: React.FC<ModalProps> = ({
       onClick={onClose}
     >
       <div
-        className={`w-full ${maxWidth} max-h-[92vh] overflow-y-auto slide-up p-5 sm:p-6 shadow-2xl rounded-t-lg sm:rounded-none`}
+        ref={panelRef}
+        className={`w-full ${maxWidth} max-h-[92vh] overflow-y-auto p-5 sm:p-6 shadow-2xl rounded-t-lg sm:rounded-none`}
         style={{
           background: C.card,
           border: `1px solid ${C.border}`,

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { Colors } from '@/lib/theme';
 
 interface FieldProps {
@@ -9,6 +9,8 @@ interface FieldProps {
   placeholder?: string;
   C: Colors;
   required?: boolean;
+  autoComplete?: string;
+  disabled?: boolean;
   min?: number | string;
   max?: number | string;
   step?: number | string;
@@ -23,20 +25,27 @@ export const Field = React.memo<FieldProps>(({
   placeholder,
   C,
   required,
+  autoComplete,
+  disabled,
   min,
   max,
   step,
   className = '',
 }) => {
+  const id = useId();
   return (
     <div className={`w-full ${className}`}>
       <label
+        htmlFor={id}
         className="block font-display font-bold text-xs tracking-widest mb-1.5"
         style={{ color: C.muted }}
       >
         {label}
       </label>
       <input
+        id={id}
+        autoComplete={autoComplete}
+        disabled={disabled}
         type={type}
         value={value}
         required={required}

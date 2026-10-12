@@ -46,7 +46,8 @@ export default function ResetPasswordPage() {
       }
       const client = getSupabaseClient();
       const session = client ? (await client.auth.getSession()).data.session : null;
-      setStatus(session || pending ? "form" : "expired");
+      if (!session) clearPendingPasswordReset();
+      setStatus(session ? "form" : "expired");
     })();
   }, []);
 

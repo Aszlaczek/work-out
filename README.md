@@ -1,153 +1,122 @@
-# ⚡ GYM PROGRESS PLATFORM
+# GYM PROGRESS
 
-Nowoczesna aplikacja webowa w **Next.js (App Router) + TypeScript + Tailwind CSS** z backendem w chmurze **Supabase (PostgreSQL + RLS + Auth)**, dedykowana do planowania, rejestrowania, analizy oraz **uaktualniania (edycji)** swoich treningów siłowych.
+Aplikacja do planowania i rejestrowania treningów siłowych, rozwijana z pomocą narzędzi AI (w tym Codex). Łączy dziennik treningowy, bibliotekę ćwiczeń, kalendarz i wykresy postępów. Interfejs jest dostosowany do telefonu i komputera, z jasnym i ciemnym motywem oraz tłumaczeniami PL/EN.
 
-Aplikacja w 100% odzwierciedla design z prototypu `base` (ciemny/jasny motyw, dynamiczne akcenty pomarańczowe i fioletowe, typografia *Barlow Condensed* + *Outfit* + *JetBrains Mono*, animacje i wykresy progresu) oraz została zbudowana w metodyce **mobile-first** z pełną responsywnością na smartfony i komputery PC.
+AI wspiera analizę kodu, implementację, dokumentowanie zmian i przygotowanie testów. Nie jest funkcją aplikacji: projekt nie wysyła dziennika treningów do modelu AI i nie wymaga klucza API do modelu. Zmiany wygenerowane z pomocą AI podlegają tym samym testom i przeglądowi kodu co pozostałe zmiany.
 
----
+## Funkcje
 
-## 📱 Responsywność & Mobile-First
+- **Dashboard:** podsumowanie aktywności, historia i szybki start treningu.
+- **Plany:** własne rutyny z ćwiczeniami, seriami i docelowymi powtórzeniami. Edycja planu predefiniowanego tworzy prywatną kopię; jego usunięcie ukrywa go tylko dla danego użytkownika.
+- **Ćwiczenia:** wyszukiwanie, kategorie, własne ćwiczenia i prywatne notatki. Zmiany ćwiczeń predefiniowanych są zapisywane jako prywatne nadpisania; ukryte pozycje można przywrócić.
+- **Dziennik:** trening na żywo ze stoperem, ciężarem, powtórzeniami i RPE; ręczny zapis oraz edycja historycznych sesji. Szkic aktywnego treningu jest zapisywany w przeglądarce osobno dla każdego konta.
+- **Kalendarz i progres:** historia miesięczna, wykres maksymalnego ciężaru dla ćwiczenia, rekord i trend.
+- **Konto:** rejestracja, potwierdzenie e-maila, logowanie, odzyskiwanie i zmiana hasła oraz usunięcie konta.
+- **Animacje animejs:** wejście widoków i okien modalnych, z obsługą `prefers-reduced-motion`.
 
-- **Na smartfonie (Mobile)**:
-  - Dolny pasek nawigacji (**Bottom Navigation Bar**) z ikonami dla szybkiego dostępu kciukiem (`DASHBOARD`, `RUTYNY`, `ĆWICZENIA`, `KALENDARZ`, `PROGRES`).
-  - Pływający pasek aktywnego treningu (**Active Workout Banner**) z pulsującym wskaźnikiem na żywo — powrót do logowania serii 1 kliknięciem.
-  - Dotykowo zoptymalizowane pola wpisywania ciężaru/powtórzeń (rozmiar min. 44px, zapobieganie niepożądanemu zoomowi iOS).
-  - Modalne szuflady (Bottom Sheets) z animacją `slide-up`.
-- **Na komputerze (PC / Tablet)**:
-  - Górny pasek nawigacji (**Header**) z logo `GP`, zakładkami, statusem połączenia z chmurą Supabase, ustawieniami i wylogowaniem.
-  - Wielokolumnowe układy dashboardu (3-kolumnowe kafelki statystyk, szybki start, harmonogram).
-  - Dwukolumnowy Routine Builder (lista planów po lewej, szczegółowa tabela ćwiczeń po prawej).
-  - Pełnowymiarowy interaktywny wykres progresu **Recharts** z linią rekordu (PR).
+## Stos i struktura
 
----
+Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS, Supabase Auth/PostgreSQL/RLS, Recharts, animejs 4, Lucide i Vercel Analytics. Testy: Jest, React Testing Library i jsdom. Dokładne wersje instalacji zapisuje `package-lock.json`.
 
-## 🎯 Główne Funkcjonalności
-
-### 1. 📋 Planowanie Treningu (Routines & Planning)
-- **Kreator planów treningowych**: Tworzenie nowych rutyn (np. *Push A*, *Pull A*, *Legs A*, *Góra Siła*).
-- **Konfiguracja serii i powtórzeń docelowych**: Określanie liczby serii oraz zakresu powtórzeń dla każdego ćwiczenia.
-- **Edycja i aktualizacja planów**: Dodawanie i usuwanie ćwiczeń z istniejących rutyn w dowolnym momencie.
-- **Szybki start**: Rozpoczęcie sesji treningowej jednym kliknięciem na podstawie wybranego planu.
-
-#### Widoczność planów treningowych
-- **Plany predefiniowane** (wspólne dla wszystkich użytkowników) — każdy je widzi, może z nich startować trening.
-  - **Usunięcie = ukrycie tylko dla siebie.** Plan znika z Twojej listy, ale pozostaje widoczny dla pozostałych użytkowników. Ukryte plany można przywrócić w sekcji `UKRYTE PLANY`.
-  - **Edycja = prywatna kopia.** Zapisanie zmian tworzy Twój własny plan (oryginał pozostaje nietknięty i dostępny dla innych).
-- **Plany własne** — tworzone samodzielnie, widoczne **wyłącznie** dla właściciela. Inni użytkownicy nie mogą ich zobaczyć ani otworzyć.
-
-### 2. ⚡ Zapis Treningu (Workout Logger)
-- **Aktywny Trening na Żywo**:
-  - Automatyczny stoper czasu trwania sesji (minuty i sekundy).
-  - Tabela serii dla każdego ćwiczenia: Ciężar (KG), Powtórzenia, wskaźnik RPE oraz odhaczanie serii (✓).
-  - Możliwość dodania kolejnej serii (`+ DODAJ SERIĘ`) lub nowego ćwiczenia w trakcie trwania treningu.
-  - Zakończenie sesji i automatyczny zapis do bazy danych Supabase.
-- **Zapis Treningu Odbytego (Manual Log)**:
-  - Opcja zapisania treningu wykonanego wcześniej bez uruchamiania stopera na żywo.
-
-### 3. 🔄 Uaktualnienie Treningu (Workout Updating & Editing)
-- **Pełna edycja każdego zapisanego treningu**:
-  - Użytkownik może otworzyć dowolny trening z Dashboardu, Kalendarza lub Historii i wybrać opcję **"EDYTUJ" / "UAKTUALNIENIE TRENINGU"**.
-  - Zmiana daty, czasu trwania oraz notatek treningowych.
-  - Modyfikacja zarejestrowanych ciężarów, liczby powtórzeń, wartości RPE i statusu serii.
-  - Dodawanie nowych ćwiczeń lub serii do historycznego treningu.
-  - Usuwanie pomyłkowo wpisanych serii lub ćwiczeń.
-  - Usunięcie całego treningu z bazy danych.
-
-### 4. 📚 Baza Ćwiczeń (Exercises Library)
-- Zestaw ćwiczeń startowych podzielonych na kategorie: `Pchające (push)`, `Ciągnące (pull)`, `Nogi (legs)`, `Core (core)`.
-- Wyszukiwarka i filtry kategorii.
-- Dodawanie własnych ćwiczeń (`CUSTOM`) z przypisaniem partii mięśniowej.
-
-#### Widoczność ćwiczeń
-- **Ćwiczenia predefiniowane** — widoczne dla wszystkich użytkowników.
-  - **Edycja** zapisywana jest jako Twoja prywatna modyfikacja (`user_exercise_overrides`): zmieniasz je tylko u siebie, pozostali widzą oryginał. Zmodyfikowane ćwiczenie dostaje plakietkę `ZMODYFIKOWANE`.
-  - **Usunięcie = ukrycie tylko dla siebie** — inne konta nadal widzą to ćwiczenie. Ukryte można przywrócić przyciskiem `UKRYTE`.
-  - Notatki i wskazówki techniczne zawsze są prywatne (dotyczą tylko Twojego konta).
-- **Ćwiczenia własne** — widoczne **wyłącznie** dla użytkownika, który je dodał; edycja i usunięcie dotyczą tylko jego kopii.
-
-### 5. 📅 Kalendarz Treningów (Interactive Calendar)
-- Widok siatki miesięcznej z oznaczeniem odbytych treningów (kropki aktywności) i dzisiejszego dnia.
-- Kliknięcie w dowolny dzień wyświetla listę wykonanych treningów wraz z możliwością ich natychmiastowego podejrzenia i edycji.
-
-### 6. 📈 Analiza Progresu (Progress Analysis)
-- Interaktywny wykres liniowy z biblioteki **Recharts** przedstawiający maksymalne obciążenie na sesję w czasie.
-- Statystyki: **Rekord życiowy (PR)**, **Średnia**, **Trend (+/- kg)**.
-- Linia referencyjna rekordu na wykresie.
-
-### 7. ⚙️ Motyw, Język i Bezpieczeństwo
-- **Motyw**: Przełącznik ciemnego (Deep Space `#07071a`) i jasnego (Clean Athletic `#f0eff6`) motywu.
-- **Wielojęzyczność**: Pełne wsparcie dla języka **polskiego (PL)** i **angielskiego (EN)**.
-- **Autentykacja**: Rejestracja, Logowanie, Reset hasła, Usuwanie konta.
-- **Obowiązkowe potwierdzenie e-maila**: Po rejestracji aplikacja **czeka na kliknięcie linku** wysłanego na adres e-mail. Dopiero potwierdzone konto może się zalogować — do tego czasu ekran logowania pokazuje prośbę o otwarcie linku (z opcją wysłania go ponownie). W trybie lokalnym (bez Supabase) link potwierdzający jest symulowany przyciskiem `OTWÓRZ LINK POTWIERDZAJĄCY (DEMO)`.
-- **Zmiana hasła (Ustawieniach → `BEZPIECZEŃSTWO`)**: formularz prosi o obecne hasło, nowe hasło i jego potwierdzenie. Obecne hasło jest weryfikowane przed zapisem, więc samo posiadanie sesji nie wystarczy.
-- **Reset hasła („Zapomniałem hasła")**: link z e-maila otwiera podstronę `/reset-password` i **blokuje wejście do aplikacji** — dopóki nowe hasło nie zostanie ustawione, użytkownik nie może się zalogować (także starym hasłem). Po zapisaniu nowego hasła sesja z linku resetującego jest wylogowywana i trzeba zalogować się ponownie. W trybie lokalnym link jest symulowany przyciskiem `OTWÓRZ LINK RESETUJĄCY (DEMO)`.
-
----
-
-## 🗄️ Baza Danych Supabase
-
-Struktura bazy danych została przygotowana w pliku [`supabase/schema.sql`](file:///Users/adrian/Desktop/Projects/work-out/supabase/schema.sql) i zawiera pełne zabezpieczenia **Row Level Security (RLS)**:
-
-1. `profiles` — profile użytkowników powiązane z `auth.users`.
-2. `exercises` — ćwiczenia predefiniowane (`user_id = null`, widoczne dla wszystkich) oraz własne użytkownika (`user_id`, widoczne tylko dla właściciela).
-3. `user_exercise_overrides` — prywatne modyfikacje i ukrycia predefiniowanych ćwiczeń (dotyczą tylko jednego użytkownika).
-4. `user_exercise_notes` — prywatne notatki użytkownika do ćwiczeń.
-5. `routines` — plany treningowe: predefiniowane wspólne (`user_id = null`) i prywatne (`user_id = użytkownik`).
-6. `user_routine_hides` — ukrycia predefiniowanych planów (plan znika tylko u tego użytkownika).
-7. `routine_exercises` — ćwiczenia wchodzące w skład planów z seriami i powtórzeniami docelowymi.
-8. `workouts` — zapisane sesje treningowe (data, czas trwania, status, notatki).
-9. `workout_exercises` — ćwiczenia wykonane w danej sesji treningowej.
-10. `workout_sets` — serie z wagą, powtórzeniami, RPE i statusem wykonania.
-
-### Jak podłączyć swój projekt Supabase:
-
-1. Załóż darmowy projekt na [supabase.com](https://supabase.com).
-2. Otwórz **SQL Editor** w panelu Supabase, wklej zawartość pliku [`supabase/schema.sql`](file:///Users/adrian/Desktop/Projects/work-out/supabase/schema.sql) i kliknij **Run**.
-   - Projekt, który już korzystał ze starej wersji schematu, zamiast tego jednorazowo uruchamia migrację z katalogu [`supabase/migrations/`](file:///Users/adrian/Desktop/Projects/work-out/supabase/migrations):
-     ```bash
-     npx supabase db push --skip-vault
-     ```
-     (albo wklej ten sam plik do **SQL Editor** i kliknij **Run**).
-     Uwaga: komendy `npx supabase migrate` i `npx supabase migration up` dotyczą wyłącznie bazy **lokalnej** i wymagają Docker — na projekt online używa się `db push`.
-3. W panelu Supabase przejdź do **Authentication → Sign In / Providers → Email** i upewnij się, że opcja **Confirm email** jest włączona (bez niej rejestracja nie wymaga kliknięcia linku).
-4. W **Authentication → URL Configuration** ustaw **Site URL** na adres aplikacji (np. `http://localhost:3000`) oraz dodaj ten sam adres do listy **Redirect URLs** — dzięki temu link potwierdzający wraca do aplikacji i loguje użytkownika.
-5. W panelu Supabase przejdź do **Project Settings → API** i skopiuj:
-   - `Project URL`
-   - `anon public key`
-6. Wklej je do pliku `.env.local`:
-   ```env
-   NEXT_PUBLIC_SUPABASE_URL=https://twoj-projekt.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=twoj-klucz-anon
-   ```
-7. Jeśli zmienne nie zostaną podane, aplikacja automatycznie uruchamia się w **trybie lokalnym (Demo)** z zachowaniem pełnej funkcjonalności i pamięci przeglądarki!
-
----
-
-## 🚀 Uruchomienie Aplikacji
-
-### Wymagania:
-- Node.js 18+ (zalecany Node.js 20 lub 22)
-- npm
-
-### 1. Instalacja zależności (jeśli potrzebna):
-```bash
-npm install
+```text
+src/app/                       strony, layout i style globalne
+  api/account/route.ts         serwerowe usunięcie konta
+  auth/callback/route.ts       obsługa token_hash z potwierdzenia e-maila
+  reset-password/page.tsx      formularz ustawiania odzyskanego hasła
+src/components/                widoki domenowe i wspólne elementy UI
+src/lib/repository.ts          operacje danych, Auth i wariant lokalny
+src/lib/supabase/client.ts     klient Supabase i stan odzyskiwania hasła
+src/lib/hooks/                 współdzielone zachowania, m.in. animacje
+src/lib/{types,seedData,i18n,theme}.ts
+supabase/schema.sql            schemat nowej bazy, RLS i dane startowe
+supabase/migrations/           aktualizacje istniejącego schematu
+agents/                       opis projektu, backlog i dziennik prac
+tests/                         testy regresji
 ```
 
-### 2. Uruchomienie serwera deweloperskiego:
+## Uruchomienie
+
+Wymagane Node.js 22 LTS i npm. Polecenia wykonuj w katalogu projektu:
+
 ```bash
+npm ci
+cp .env.local.example .env.local
 npm run dev
 ```
 
-Aplikacja będzie dostępna pod adresem: [http://localhost:3000](http://localhost:3000)
+Otwórz `http://localhost:3000`. Pozostawienie przykładowej konfiguracji Supabase uruchamia tryb demonstracyjny. Jeśli masz już `.env.local`, zachowaj jego konfigurację zamiast nadpisywać plik.
 
-Domyślne konto demo (działa zarówno offline, jak i z bazą):
-- **E-mail**: `demo@gymapp.io`
-- **Hasło**: `demo1234`
-(Można także zarejestrować nowe własne konto).
-
-### 3. Zbudowanie wersji produkcyjnej:
 ```bash
-npm run build
-npm start
+npm run typecheck       # sprawdzenie typów
+npm test                # jednorazowy przebieg Jest
+npm run test:watch      # praca nad testami
+npm run test:coverage   # raport w coverage/
+npm run build           # kompilacja produkcyjna
+npm start               # start zbudowanej aplikacji
 ```
+
+Historyczny skrypt `npm run lint` wymaga jeszcze skonfigurowania ESLint; obecnie kontrolę zmian zapewniają TypeScript, Jest i build. Nie uruchamiaj równocześnie `next dev` i `next build` w tym samym katalogu `.next`.
+
+## Dwa tryby przechowywania danych
+
+### Demo lokalne
+
+Bez poprawnych publicznych zmiennych Supabase aplikacja korzysta z `localStorage`. Pierwsze uruchomienie udostępnia konto `demo@gymapp.io` / `demo1234`. Można też utworzyć inne konto; potwierdzenie i reset hasła są symulowane w UI.
+
+Każde konto otrzymuje własny identyfikator. Hasło zmienione w ustawieniach pozostaje zmienione po ponownym logowaniu. Usunięcie ostatniego konta nie odtwarza konta demo. Reset pamięci lokalnej przywraca stan pierwszego uruchomienia.
+
+To tryb demonstracyjny, nie uwierzytelnianie produkcyjne: hasła i dane są przechowywane w przeglądarce, bez szyfrowania haseł. Nie używaj rzeczywistych haseł. Dane nie synchronizują się między urządzeniami. Starsze wersje współdzieliły identyfikator lokalny; migracja zachowuje go dla aktualnie zalogowanego konta, ale nie może odtworzyć historycznego właściciela wcześniej wymieszanych danych.
+
+### Supabase
+
+1. Utwórz projekt Supabase. Dla nowej bazy uruchom `supabase/schema.sql` w SQL Editor. Plik jest schematem inicjalnym, nie migracją do wielokrotnego uruchamiania.
+2. Dla istniejącej starszej instalacji zastosuj właściwe, jeszcze niewykonane pliki z `supabase/migrations/`; nie odtwarzaj całego schematu nad danymi.
+3. Włącz potwierdzanie e-maila w konfiguracji dostawcy Email.
+4. Ustaw Site URL i dozwolone Redirect URLs dla używanych domen, uwzględniając `/auth/callback` i `/reset-password` (także lokalny adres podczas developmentu).
+5. Uzupełnij konfigurację:
+
+```dotenv
+NEXT_PUBLIC_SUPABASE_URL=https://twoj-projekt.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=publiczny-klucz-anon
+SUPABASE_SERVICE_ROLE_KEY=prywatny-klucz-serwerowy
+```
+
+Dwie pierwsze zmienne są publiczne. `SUPABASE_SERVICE_ROLE_KEY` jest wykorzystywany wyłącznie przez endpoint serwerowy; nie dodawaj prefiksu `NEXT_PUBLIC_`, nie umieszczaj wartości w repozytorium ani w kodzie przeglądarki. Na hostingu ustaw go jako zmienną środowiskową i ponownie uruchom/wdróż aplikację. Hosting musi obsługiwać serwer Next.js; sam eksport statyczny nie obsłuży endpointu kont.
+
+Konto demo nie jest automatycznie tworzone w Supabase. W trybie chmurowym zarejestruj własne konto. Błędy połączenia z chmurą nie przełączają odczytów na lokalne dane.
+
+Potwierdzenie e-maila zależy także od szablonu wiadomości: obecny callback obsługuje `token_hash` i `type` (np. link `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=signup` w szablonie potwierdzenia). Po potwierdzeniu użytkownik loguje się w aplikacji. Pełny przepływ PKCE/cookie SSR pozostaje w backlogu.
+
+## Hasło i usuwanie konta
+
+**Zmiana hasła:** Ustawienia → Bezpieczeństwo. Wymagane są bieżące hasło, nowe hasło (minimum 6 znaków; Supabase może wymagać więcej) i potwierdzenie. Formularz zachowuje fokus podczas pisania, działa po wysłaniu Enterem i pokazuje wynik operacji. Bieżące hasło jest weryfikowane przed zmianą.
+
+**Odzyskiwanie:** link z wiadomości otwiera `/reset-password`. W chmurze wymagane jest posiadanie sesji z Supabase; sam lokalny znacznik resetu nie autoryzuje zmiany. Odrzucenie nowego hasła przez politykę nie jest przedstawiane jako wygaśnięcie linku. Po pomyślnym resecie chmurowym użytkownik loguje się ponownie. Lokalny znacznik kieruje przeglądarkę do resetu — nie unieważnia starego hasła globalnie na innych urządzeniach.
+
+**Usunięcie:** Ustawienia → Strefa niebezpieczna → wpisanie `DELETE`. Przeglądarka wysyła token sesji do `DELETE /api/account`. Serwer sprawdza token przez `auth.getUser`, a następnie wywołuje `auth.admin.deleteUser` wyłącznie dla zweryfikowanego użytkownika. Nie przyjmuje identyfikatora konta od klienta. Klucze obce `ON DELETE CASCADE` usuwają profil i powiązane dane treningowe; wspólne plany i ćwiczenia pozostają. Dopiero sukces usuwa sesję i lokalny szkic. Błąd jest widoczny w formularzu i pozwala ponowić operację.
+
+Brak klucza serwerowego powoduje odpowiedź 503, a nieważny token — 401. Testy nie zastępują sprawdzenia poprawności relacji CASCADE w konkretnej wdrożonej bazie. Supabase opisuje też ograniczenia usuwania kont, m.in. czas ważności już wydanych JWT i własność plików Storage, w [dokumentacji zarządzania użytkownikami](https://supabase.com/docs/guides/auth/managing-user-data).
+
+## Wydajność i dostępność
+
+- **Wykresy na żądanie:** `ProgressView` i Recharts są ładowane przez `next/dynamic` po otwarciu Progresu, zmniejszając zakres JavaScript potrzebnego przy wejściu do aplikacji.
+- **Jeden cykl pobierania po logowaniu:** usunięto drugi, równoległy start `loadUserData`. Niezależne odczyty nadal korzystają z `Promise.all`.
+- **Ochrona przed spóźnionymi odpowiedziami:** wyniki starszego pobrania nie zastępują danych nowszego konta ani stanu po wylogowaniu.
+- **Stabilne formularze:** sekcja ustawień nie jest definiowana ponownie jako nowy komponent przy każdym znaku; pola zachowują element DOM i fokus. Etykiety są powiązane z polami.
+- **Lekki ruch:** animejs animuje tylko `opacity` i `transform`, sprząta animacje przy zmianie widoku/odmontowaniu i reaguje na zmianę `prefers-reduced-motion`. Preferencja obejmuje też istniejące animacje CSS.
+
+Wzorce integracji opisują oficjalne dokumentacje [animejs](https://animejs.com/documentation/getting-started/using-with-react) i [testowania Next.js z Jest](https://nextjs.org/docs/14/app/building-your-application/testing/jest).
+
+## Testy i weryfikacja zmian
+
+Jest sprawdza logikę kont lokalnych, zmianę i reset hasła, rozdzielenie danych, błędy pamięci przeglądarki, fokus i komunikaty formularza, autoryzację endpointu usuwania oraz cykl życia animacji. Supabase i żądania sieciowe są zastępowane atrapami — testy nie łączą się z produkcyjną bazą i nie usuwają rzeczywistych użytkowników.
+
+Przed wdrożeniem na testowym projekcie Supabase sprawdź rejestrację/potwierdzenie, odzyskiwanie hasła z wiadomości, zmianę hasła oraz usunięcie jednorazowego konta wraz z jego danymi. Zachowaj także drugie konto kontrolne i potwierdź, że jego dane pozostały nienaruszone.
+
+## Dokumentacja pracy z AI
+
+- [`agents/PERSONAL.md`](agents/PERSONAL.md) — stała tożsamość, architektura i kluczowe zasady produktu; zmieniany **wyłącznie przy dodaniu nowych kluczowych funkcjonalności**.
+- [`agents/TODO.md`](agents/TODO.md) — priorytety i możliwe dalsze usprawnienia.
+- [`agents/DONE.md`](agents/DONE.md) — wykonane zadania z datą i zakresem weryfikacji, najnowsze na górze.
+
+Codzienne poprawki, refaktoryzacje i aktualizacje zależności opisuj w DONE, bez zmiany PERSONAL. Planowane funkcje oznaczaj jako plany, nie jako funkcje już dostępne. Nie zapisuj sekretów, danych prawdziwych użytkowników ani wyników testów, które nie zostały wykonane.

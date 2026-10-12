@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
+import { useEntranceAnimation } from "@/lib/hooks/useEntranceAnimation";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Theme, getColors, Colors } from "@/lib/theme";
 import { Lang, T } from "@/lib/i18n";
 import {
@@ -21,13 +23,17 @@ import { RoutinesView } from "@/components/routines/RoutinesView";
 import { ExercisesView } from "@/components/exercises/ExercisesView";
 import { CalendarView } from "@/components/calendar/CalendarView";
 import { ActiveWorkoutLogger } from "@/components/workouts/ActiveWorkoutLogger";
-import { ProgressView } from "@/components/progress/ProgressView";
 import { SettingsView } from "@/components/settings/SettingsView";
 import { WorkoutEditModal } from "@/components/workouts/WorkoutEditModal";
 import { WorkoutDetailModal } from "@/components/workouts/WorkoutDetailModal";
 import { ManualWorkoutModal } from "@/components/workouts/ManualWorkoutModal";
 import { RoutineModal } from "@/components/routines/RoutineModal";
 import { Analytics } from "@vercel/analytics/next";
+
+const ProgressView = dynamic(
+  () => import("@/components/progress/ProgressView").then((module) => module.ProgressView),
+  { loading: () => <div className="p-8" role="status" aria-label="Loading">…</div> },
+);
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
@@ -56,6 +62,7 @@ export default function Home() {
   const [isManualLogOpen, setIsManualLogOpen] = useState(false);
   const [isPlanRoutineOpen, setIsPlanRoutineOpen] = useState(false);
 
+  const mainRef = useEntranceAnimation(`${user?.id ?? "guest"}:${view}`);
   const C: Colors = getColors(theme);
   const t = T[lang];
   const isCloud = repository.isCloudConnected();
@@ -77,13 +84,6 @@ export default function Home() {
 
     const savedLang = localStorage.getItem("gp_lang") as Lang;
     if (savedLang === "pl" || savedLang === "en") setLang(savedLang);
-
-    const savedActive = localStorage.getItem("gp_active_workout");
-    if (savedActive) {
-      try {
-        setActiveWorkout(JSON.parse(savedActive));
-      } catch (e) {}
-    }
 
     // Load initial user session
     repository.getInitialUser().then((u) => {
@@ -109,8 +109,11 @@ export default function Home() {
     localStorage.setItem("gp_lang", newLang);
   };
 
+  const dataRequestId = useRef(0);
+
   // Load data for active user
   const loadUserData = useCallback(async (userId?: string) => {
+    const requestId = ++dataRequestId.current;
     try {
       const [
         fetchedRoutines,
@@ -125,12 +128,14 @@ export default function Home() {
         repository.getHiddenRoutines(userId),
         repository.getHiddenExercises(userId),
       ]);
+      if (requestId !== dataRequestId.current) return;
       setRoutines(fetchedRoutines);
       setWorkouts(fetchedWorkouts);
       setExercises(fetchedExercises);
       setHiddenRoutines(fetchedHiddenRoutines);
       setHiddenExercises(fetchedHiddenExercises);
     } catch (e) {
+      if (requestId !== dataRequestId.current) return;
       console.error("[data] loading failed:", e);
       const message = e instanceof Error ? e.message : String(e);
       if ((e as { sessionExpired?: boolean })?.sessionExpired) {
@@ -150,13 +155,22 @@ export default function Home() {
   useEffect(() => {
     if (user) {
       loadUserData(user.id);
+      // Migrate the old single draft once, to the currently authenticated owner.
+      const key = `gp_active_workout_${user.id}`;
+      const saved = localStorage.getItem(key) ?? localStorage.getItem("gp_active_workout");
+      try {
+        setActiveWorkout(saved ? JSON.parse(saved) : null);
+        if (saved) localStorage.setItem(key, saved);
+        localStorage.removeItem("gp_active_workout");
+      } catch { setActiveWorkout(null); }
     }
+    return () => { dataRequestId.current += 1; };
   }, [user, loadUserData]);
 
   // Persist active workout to local storage
   const handleUpdateActiveWorkout = (updated: ActiveWorkout) => {
     setActiveWorkout(updated);
-    localStorage.setItem("gp_active_workout", JSON.stringify(updated));
+    if (user) localStorage.setItem(`gp_active_workout_${user.id}`, JSON.stringify(updated));
   };
 
   // Start live workout from routine
@@ -219,7 +233,7 @@ export default function Home() {
       const saved = await repository.saveWorkout(newWorkout, user?.id);
       setWorkouts((prev) => [saved, ...prev]);
       setActiveWorkout(null);
-      localStorage.removeItem("gp_active_workout");
+      localStorage.removeItem(`gp_active_workout_${user?.id}`);
       setDataError(null);
       setView("dashboard");
     } catch (e) {
@@ -230,7 +244,7 @@ export default function Home() {
 
   const handleDiscardActiveWorkout = () => {
     setActiveWorkout(null);
-    localStorage.removeItem("gp_active_workout");
+    localStorage.removeItem(`gp_active_workout_${user?.id}`);
     setView("dashboard");
   };
 
@@ -404,19 +418,32 @@ export default function Home() {
   const handleLoginSuccess = (loggedInUser: AppUser) => {
     setSessionExpired(false);
     setUser(loggedInUser);
-    loadUserData(loggedInUser.id);
   };
 
   const handleLogout = async () => {
     await repository.signOut();
+    dataRequestId.current += 1;
     setUser(null);
+    setRoutines([]);
+    setWorkouts([]);
+    setExercises([]);
+    setHiddenRoutines([]);
+    setHiddenExercises([]);
+    setDataError(null);
     setActiveWorkout(null);
     setView("dashboard");
   };
 
   const handleDeleteAccount = async () => {
     await repository.deleteAccount();
+    dataRequestId.current += 1;
     setUser(null);
+    setRoutines([]);
+    setWorkouts([]);
+    setExercises([]);
+    setHiddenRoutines([]);
+    setHiddenExercises([]);
+    setDataError(null);
     setActiveWorkout(null);
     setView("dashboard");
   };
@@ -532,7 +559,7 @@ export default function Home() {
       />
 
       {/* Main View Area */}
-      <main className="flex-1 min-h-0 relative z-10">
+      <main ref={mainRef} className="flex-1 min-h-0 relative z-10">
         {view === "dashboard" && (
           <DashboardView
             workouts={workouts}
